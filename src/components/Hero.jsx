@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Img from './Img'
 import NearbyMap from './NearbyMap'
 import { brand } from '../data/site'
@@ -23,6 +23,20 @@ export default function Hero({ scrollTo }) {
     setLeaving(active)
     setActive(null)
   }
+
+  // Touch: a photo was already open when the tap started, so this tap closes it
+  const wasOpen = useRef(false)
+  const panel = useRef(null)
+
+  // Touch anywhere outside the panel also closes the open photo
+  useEffect(() => {
+    if (active === null) return
+    const close = (e) => {
+      if (e.pointerType === 'touch' && !panel.current?.contains(e.target)) reset()
+    }
+    document.addEventListener('pointerdown', close)
+    return () => document.removeEventListener('pointerdown', close)
+  })
 
   return (
     <section id="home" className="relative flex flex-1 flex-col justify-center overflow-hidden bg-cream text-navy">
@@ -92,6 +106,7 @@ export default function Hero({ scrollTo }) {
         {/* Stacked photos: each shows its own slice; hovering one fades the others so it fills the box.
             Column on mobile (right edge fades), row from md up (top edge fades). */}
         <div
+          ref={panel}
           className="relative h-[28rem] min-w-0 overflow-hidden md:h-80 lg:col-span-3 lg:h-[24rem]"
           onMouseLeave={reset}
         >
@@ -134,8 +149,9 @@ export default function Hero({ scrollTo }) {
                   tabIndex={0}
                   role="button"
                   aria-label={a.title}
-                  onMouseEnter={() => show(idx)}
-                  onClick={() => show(idx)}
+                  onPointerEnter={(e) => e.pointerType === 'mouse' && show(idx)}
+                  onPointerDown={(e) => { wasOpen.current = e.pointerType === 'touch' && active !== null }}
+                  onClick={() => (wasOpen.current ? reset() : show(idx))}
                   onFocus={() => show(idx)}
                   onBlur={reset}
                   className="relative min-h-0 min-w-0 flex-1 cursor-pointer focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-sun"
