@@ -1,0 +1,171 @@
+import { useState } from 'react'
+import Img from './Img'
+import NearbyMap from './NearbyMap'
+import { brand } from '../data/site'
+
+// Replace the image paths and text with your real amenities.
+const amenities = [
+  { title: 'Gym', info: 'Fully equipped gym open all day for residents.', src: '/images/hero/gym.webp' },
+  { title: 'Gaming Zone', info: 'Console and board games to unwind after work.', src: '/images/hero/gaming.webp' },
+  { title: 'Pickleball Court', info: 'Play with housemates on our own court.', src: '/images/hero/pickleball.webp' },
+  { title: 'Café Area', info: 'A cosy space to work, chat or grab a coffee.', src: '/images/hero/cafe.webp' },
+]
+
+export default function Hero({ scrollTo }) {
+  const [active, setActive] = useState(null) // null = all equal
+  const [leaving, setLeaving] = useState(null) // photo fading out over the restored slices
+
+  const show = (idx) => {
+    setLeaving(null)
+    setActive(idx)
+  }
+  const reset = () => {
+    setLeaving(active)
+    setActive(null)
+  }
+
+  return (
+    <section id="home" className="relative flex flex-1 flex-col justify-center overflow-hidden bg-cream text-navy">
+      {/* Mobile background: public/images/background/mbg.jpg */}
+      <img
+        aria-hidden="true"
+        src="/images/background/mbg.jpg"
+        alt=""
+        loading="eager"
+        decoding="async"
+        className="pointer-events-none absolute inset-0 h-full w-full object-cover object-center opacity-40 grayscale lg:hidden"
+        style={{
+          maskImage: "linear-gradient(180deg, transparent 0%, #000 35%)",
+          WebkitMaskImage: "linear-gradient(180deg, transparent 0%, #000 35%)",
+        }}
+      />
+
+      {/* Background: faded aerial photo on the right, behind the 3D map */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 hidden w-1/2 lg:block">
+        <img
+          src="/images/hero/bg.webp"
+          alt=""
+          loading="eager"
+          decoding="async"
+          className="h-full w-full object-cover object-center opacity-40 grayscale"
+          style={{
+            maskImage: 'linear-gradient(90deg, transparent 0%, #000 45%), linear-gradient(180deg, transparent 0%, #000 35%)',
+            maskComposite: 'intersect',
+            WebkitMaskImage: 'linear-gradient(90deg, transparent 0%, #000 45%), linear-gradient(180deg, transparent 0%, #000 35%)',
+            WebkitMaskComposite: 'source-in',
+          }}
+        />
+      </div>
+
+      {/* Content: relative so it stays above the background */}
+      <div className="relative mx-auto grid w-full max-w-6xl gap-x-8 gap-y-6 px-4 py-8 md:py-10 lg:grid-cols-5">
+        {/* Mobile order: heading, nearby map, amenities. From lg: heading + amenities left, map right. */}
+        <div className="min-w-0 lg:col-span-3">
+          <h1 className="text-3xl font-bold leading-[1.1] tracking-tight sm:text-4xl md:text-5xl lg:text-[3.25rem]">
+            Premium co-living,
+            <span className="relative mt-1 block w-fit">
+              <span
+                aria-hidden="true"
+                className="absolute inset-x-[-0.15em] bottom-[0.02em] h-[0.42em] -skew-x-3 rounded-sm bg-sun/45"
+              />
+              <span className="relative">built around your lifestyle</span>
+            </span>
+          </h1>
+          <p className="mt-4 max-w-xl text-sm leading-relaxed text-slate-600 sm:text-[17px]">
+            A fully furnished PG with a gym, gaming zone, pickleball court and café,
+            close to Hinjewadi's IT parks and the metro.
+          </p>
+          <p className="mt-2 font-semibold text-gold-deep">{brand.tagline}</p>
+          <button
+            onClick={() => scrollTo('stays')}
+            className="mt-6 w-full rounded-full bg-sun px-6 py-3 font-semibold text-navy shadow-sm transition hover:brightness-95 sm:w-auto"
+          >
+            See available stays
+          </button>
+        </div>
+
+        {/* Nearby map: sits between heading and amenities on mobile */}
+        <div className="flex min-w-0 items-start lg:col-span-2 lg:col-start-4 lg:row-span-2 lg:row-start-1 lg:-mr-8 lg:pt-2">
+          <NearbyMap />
+        </div>
+
+        {/* Stacked photos: each shows its own slice; hovering one fades the others so it fills the box.
+            Column on mobile (right edge fades), row from md up (top edge fades). */}
+        <div
+          className="relative h-[28rem] min-w-0 overflow-hidden md:h-80 lg:col-span-3 lg:h-[24rem]"
+          onMouseLeave={reset}
+        >
+          {amenities.map((a, idx) => {
+            const isActive = idx === active
+            const dim = active !== null && !isActive
+            return (
+              <div
+                key={a.title}
+                aria-hidden="true"
+                style={{ '--i': idx, '--n': amenities.length }}
+                className={`hero-slice fade-mask absolute inset-0 ${isActive ? 'is-active z-10' : ''} ${dim ? 'is-dim' : ''}`}
+              >
+                <Img src={a.src} alt="" className="h-full w-full object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-navy/90 via-navy/20 to-transparent" />
+              </div>
+            )
+          })}
+
+          {/* On exit the slices are back at once; the last photo fades out on top of them */}
+          {leaving !== null && (
+            <div
+              key={leaving}
+              aria-hidden="true"
+              className="hero-leave absolute inset-0 z-10"
+              onAnimationEnd={() => setLeaving(null)}
+            >
+              <Img src={amenities[leaving].src} alt="" className="h-full w-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-navy/90 via-navy/20 to-transparent" />
+            </div>
+          )}
+
+          {/* Hover targets and labels, one cell per slice */}
+          <div className="absolute inset-0 z-20 flex flex-col md:flex-row">
+            {amenities.map((a, idx) => {
+              const isActive = idx === active
+              return (
+                <div
+                  key={a.title}
+                  tabIndex={0}
+                  role="button"
+                  aria-label={a.title}
+                  onMouseEnter={() => show(idx)}
+                  onClick={() => show(idx)}
+                  onFocus={() => show(idx)}
+                  onBlur={reset}
+                  className="relative min-h-0 min-w-0 flex-1 cursor-pointer focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-sun"
+                >
+                  {/* Collapsed title: horizontal on mobile, vertical (bottom-to-top) from md up */}
+                  <div
+                    className={`absolute left-4 top-1/2 flex -translate-y-1/2 items-center gap-2 text-white transition-opacity duration-300 md:bottom-4 md:left-1/2 md:top-auto md:-translate-x-1/2 md:translate-y-0 md:flex-col ${active === null ? 'opacity-100' : 'opacity-0'
+                      }`}
+                  >
+                    <span className="whitespace-nowrap text-sm font-semibold md:rotate-180 md:text-base md:[writing-mode:vertical-rl]">
+                      {a.title}
+                    </span>
+                    <span className="hidden size-1.5 rounded-full bg-sun md:block" />
+                  </div>
+
+                  {/* Expanded: title + extra info, shown over the full image */}
+                  <div
+                    className={`pointer-events-none absolute bottom-0 left-0 w-full p-4 transition-all duration-500 md:p-5 ${isActive ? 'translate-y-0 opacity-100' : 'translate-y-3 opacity-0'
+                      }`}
+                  >
+                    <h3 className="text-lg font-bold text-gold md:text-xl">{a.title}</h3>
+                    <p className="mt-1 text-sm text-white/90">{a.info}</p>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+      </div>
+    </section>
+  )
+}

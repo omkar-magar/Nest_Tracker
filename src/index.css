@@ -1,0 +1,61 @@
+@import "tailwindcss";
+@import "@photo-sphere-viewer/core/index.css";
+
+/* Brand colours from the flyers. Change here and the whole site updates. */
+@theme {
+  --color-navy: #1c1f4a;
+  --color-gold: #e3a72f;
+  --color-sun: #f2c230;       /* bright yellow: hero button, highlight, map accents */
+  --color-gold-deep: #8a6a00; /* dark gold text on light backgrounds */
+  --color-cream: #fbfaf6;     /* light page background */
+  --font-sans: "Poppins", sans-serif;
+}
+
+/* Amenity slices: each photo is clipped to its own slice (column on mobile, row from md up).
+   The active photo shows full size; the others fade out (opacity only, no motion). */
+.hero-slice {
+  clip-path: inset(calc(var(--i) * 100% / var(--n)) 0 calc(100% - (var(--i) + 1) * 100% / var(--n)) 0);
+  transition: none; /* reappearing on exit: instant, .hero-leave covers the change */
+}
+.hero-slice.is-dim {
+  opacity: 0;
+  transition: opacity 0.5s ease-in-out 0.15s; /* disappearing */
+}
+.hero-slice.is-active {
+  clip-path: inset(0);
+  animation: slice-in 2s ease-out; /* hovered photo shows at once, then eases up to full */
+}
+@keyframes slice-in { from { opacity: 0.5; } to { opacity: 1; } }
+.hero-leave { animation: slice-out 0.5s ease-in-out forwards; }
+@keyframes slice-out { from { opacity: 1; } to { opacity: 0; } }
+@media (min-width: 768px) {
+  .hero-slice {
+    clip-path: inset(0 calc(100% - (var(--i) + 1) * 100% / var(--n)) 0 calc(var(--i) * 100% / var(--n)));
+  }
+  .hero-slice.is-active { clip-path: inset(0); }
+}
+
+/* Soft transparent fade instead of a hard edge: right edge on mobile, top edge from md up.
+   The mask is 4x the box; the active photo moves it so the fade disappears. */
+.fade-mask {
+  -webkit-mask-image: linear-gradient(to right, #000 75%, transparent 100%);
+  mask-image: linear-gradient(to right, #000 75%, transparent 100%);
+  -webkit-mask-size: 400% 100%;
+  mask-size: 400% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: 100% 0;
+  mask-position: 100% 0;
+}
+.fade-mask.is-active { -webkit-mask-position: 0 0; mask-position: 0 0; }
+@media (min-width: 768px) {
+  .fade-mask {
+    -webkit-mask-image: linear-gradient(to top, #000 75%, transparent 100%);
+    mask-image: linear-gradient(to top, #000 75%, transparent 100%);
+    -webkit-mask-size: 100% 400%;
+    mask-size: 100% 400%;
+    -webkit-mask-position: 0 0;
+    mask-position: 0 0;
+  }
+  .fade-mask.is-active { -webkit-mask-position: 0 100%; mask-position: 0 100%; }
+}
