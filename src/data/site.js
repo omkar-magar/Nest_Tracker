@@ -42,13 +42,15 @@ export const rooms = [
   { id: 'stay-501', category: 'airbnb', no: '501', floor: 5, type: 'AC', beds: 4, price: '₹3,200 / night' },
 ]
 
-// Places shown on the 3D map in the hero (max 5, in this order).
-// icon: metro | hospital | work | cart | food.  km: approximate distance.  featured: shown first.
-// TODO: replace the placeholder names/distances with the real ones.
+// Places shown on the map in the hero (one per icon, 6 max).
+// icon: metro | work | home | cart | mall | food (each has its own spot on the map).
+// km: approximate distance range.  featured: shown first.  image: optional photo for the info card
+// (put the file in public/images/nearby/).  label: how the name wraps on the map (one entry per line).
 export const nearby = [
-  { name: 'Metro station', icon: 'metro', km: 'x', note: 'Quick hop to the rest of Pune.' },
-  { name: 'Hospital', icon: 'hospital', km: 'x', note: 'Medical help close by.' },
-  { name: 'Hinjewadi IT parks', icon: 'work', km: 'x', note: 'Short commute to Phase 1, 2 and 3.' },
-  { name: 'Supermarket', icon: 'cart', km: 'x', note: 'Groceries and daily needs.' },
-  { name: 'Balewadi High Street', icon: 'food', km: '4.6', note: 'Popular for cafés, food and nightlife.', featured: true },
+  { name: 'D-Mart, Hinjewadi', icon: 'cart', km: '1–2', note: 'Groceries and daily needs.', image: '/images/nearby/dmart-xion.jpg', featured: true },
+  { name: 'Xion Mall', icon: 'mall', km: '1.5–2.5', note: 'Shopping, multiplex and food court.', image: '/images/nearby/xion.jpg' },
+  { name: 'Blue Ridge Township', label: ['Blue Ridge', 'Township'], icon: 'home', km: '4–6', note: 'Large township with offices and homes.', image: '/images/nearby/blue-ridge.jpg' },
+  { name: 'Rajiv Gandhi Infotech Park', label: ['Rajiv Gandhi', 'Infotech Park'], icon: 'work', km: '4–6', note: 'Short commute to the IT parks.', image: '/images/nearby/infotech.jpg' },
+  { name: 'Balewadi High Street', label: ['Balewadi', 'High Street'], icon: 'food', km: '7–9', note: 'Popular for cafés, food and nightlife.', image: '/images/nearby/balewadi.jpg' },
+  { name: 'Hinjawadi Phase 1 Metro Station', label: ['Hinjawadi Phase 1', 'Metro Station'], icon: 'metro', km: '4–6', note: 'Quick hop to the rest of Pune.', image: '/images/nearby/metro.jpg' },
 ]
