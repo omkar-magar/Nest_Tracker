@@ -4,7 +4,7 @@
   "short_name": "YOLO Staff",
   "description": "Daily operations for YOLO Nest employees.",
   "start_url": "/staff/",
-  "scope": "/staff/",
+  "scope": "/staff",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#fbfaf6",

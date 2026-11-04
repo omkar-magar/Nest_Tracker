@@ -4,7 +4,7 @@
   "short_name": "YOLO Admin",
   "description": "Owner dashboard for YOLO Nest.",
   "start_url": "/admin/",
-  "scope": "/admin/",
+  "scope": "/admin",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#fbfaf6",
