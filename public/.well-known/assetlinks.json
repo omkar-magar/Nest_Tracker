@@ -1,0 +1,8 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "app.vercel.nest_tracker_xi.twa",
+    "sha256_cert_fingerprints": ["EA:E0:66:1C:F7:45:F5:B9:AD:51:64:80:8C:80:87:31:17:34:14:AC:B4:74:B8:44:70:F7:7D:F2:88:3F:CA:9C"]
+  }
+}]
