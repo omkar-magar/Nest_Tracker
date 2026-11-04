@@ -9,6 +9,10 @@
       ]
     },
     {
+      "source": "/.well-known/assetlinks.json",
+      "headers": [{ "key": "Content-Type", "value": "application/json" }]
+    },
+    {
       "source": "/(.*).webmanifest",
       "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
     }
