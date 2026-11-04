@@ -99,8 +99,15 @@ export default function Hero({ scrollTo }) {
         </div>
 
         {/* Nearby map: sits between heading and amenities on mobile */}
-        <div className="flex min-w-0 items-start lg:col-span-2 lg:col-start-4 lg:row-span-2 lg:row-start-1 lg:-mr-8 lg:pt-2">
-          <NearbyMap />
+        <div className="relative flex min-w-0 items-start lg:col-span-2 lg:col-start-4 lg:row-span-2 lg:row-start-1 lg:-mr-8 lg:pt-2">
+          {/* Soft white blurred circle so the map stands out from the photo */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute left-1/2 top-1/2 aspect-square w-[110%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-cream/90 blur-3xl lg:hidden"
+          />
+          <div className="relative w-full">
+            <NearbyMap />
+          </div>
         </div>
 
         {/* Stacked photos: each shows its own slice; hovering one fades the others so it fills the box.
