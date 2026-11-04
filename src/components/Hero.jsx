@@ -163,15 +163,14 @@ export default function Hero({ scrollTo }) {
                   onBlur={reset}
                   className="relative min-h-0 min-w-0 flex-1 cursor-pointer focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-sun"
                 >
-                  {/* Collapsed title: horizontal on mobile, vertical (bottom-to-top) from md up */}
+                  {/* Collapsed title: plain horizontal text; a soft shadow keeps it readable over the photo */}
                   <div
-                    className={`absolute left-4 top-1/2 flex -translate-y-1/2 items-center gap-2 text-white transition-opacity duration-300 md:bottom-4 md:left-1/2 md:top-auto md:-translate-x-1/2 md:translate-y-0 md:flex-col ${active === null ? 'opacity-100' : 'opacity-0'
+                    className={`absolute left-4 top-1/2 max-w-[calc(100%-2rem)] -translate-y-1/2 text-white [text-shadow:0_1px_3px_rgb(0_0_0/0.7),0_0_12px_rgb(0_0_0/0.5)] transition-opacity duration-300 md:bottom-4 md:left-1/2 md:top-auto md:w-max md:max-w-[calc(100%-1rem)] md:-translate-x-1/2 md:translate-y-0 ${active === null ? 'opacity-100' : 'opacity-0'
                       }`}
                   >
-                    <span className="whitespace-nowrap text-sm font-semibold md:rotate-180 md:text-base md:[writing-mode:vertical-rl]">
+                    <span className="text-lg font-semibold leading-tight md:block md:text-center md:text-sm">
                       {a.title}
                     </span>
-                    <span className="hidden size-1.5 rounded-full bg-sun md:block" />
                   </div>
 
                   {/* Expanded: title + extra info, shown over the full image */}
