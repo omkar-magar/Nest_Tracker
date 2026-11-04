@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-YOLO Nest Co-Living: the public marketing website for one PG in Hinjewadi Phase 1, Pune (monthly/daily PG beds, 1BHK flat, lodge rooms, Airbnb-style stay). Plain React 18 (JSX, no TypeScript) + Vite 6 + Tailwind v4. No backend, no API calls: all content is static.
+YOLO Nest Co-Living: the public marketing website for one PG in Hinjewadi Phase 1, Pune (monthly/daily PG beds, 1BHK flat, lodge rooms, Airbnb-style stay). Plain React 18 (JSX, no TypeScript) + Vite 6 + Tailwind v4 + react-router-dom. Supabase backend (see docs/setup.md): public site, customer/staff/admin dashboards, demo payments, three PWAs. Without Supabase env vars the public pages fall back to static content in `src/data/site.js`.
 
 This repo used to hold the Nest_Tracker stay-management app (FastAPI backend + TS frontend). That code was removed; it lives in git history and in the stash `pre-yolo-nest: uncommitted Nest_Tracker work`. Don't bring any of it back unless the developer asks.
 
@@ -8,7 +8,7 @@ This repo used to hold the Nest_Tracker stay-management app (FastAPI backend + T
 | Path | Role |
 |---|---|
 | `src/data/site.js` | **all editable content**: `brand` (name, tagline, phone, address, map query), `heroImages`, `amenities`, `categories`, `rooms`, `nearby` |
-| `src/App.jsx` | page switcher (`home` / `login` / `dashboard` via `useState`, no router), `Section` wrapper, Home sections (Amenities, Stays, Location, Contact) |
+| `src/App.jsx` | routes (public, `/account`, `/staff`, `/admin`), layouts; pages in `src/pages/` |
 | `src/components/Navbar.jsx` | sticky header; links scroll to section ids |
 | `src/components/Hero.jsx` | hero heading, expanding amenity panels, `NearbyMap` |
 | `src/components/NearbyMap.jsx` | animated SVG map; routes keyed by place `icon`, CSS inlined in the file |
@@ -34,7 +34,7 @@ No linter, formatter or tests are set up; don't add them unless asked. This mach
 - Code style: function components, 2-space indent, single quotes, no semicolons, short comments only where something is non-obvious.
 - Every section needs an `id` matching the Navbar link and `scroll-mt-16` so it clears the sticky header.
 - Must work at 390px width, keep visible focus (`focus-visible`), meaningful `alt` text, and 4.5:1 text contrast.
-- Login and Dashboard are placeholders ("Coming soon"). Don't build auth or booking until the developer asks.
+- Business logic lives in `src/services/` and in `supabase/migrations/` (RLS + RPCs); keep components thin. Payments go through `src/services/payments` only; see docs/payments.md.
 - Prices in `rooms` are demo values and `nearby` distances are `'x'` placeholders: don't invent real ones; ask the developer.
 
 ## Commits

@@ -1,109 +1,88 @@
-import { useState } from 'react'
+import { useEffect } from 'react'
+import { Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import Navbar from './components/Navbar'
-import Hero from './components/Hero'
-import Img from './components/Img'
-import { amenities, brand, categories, rooms } from './data/site'
+import Footer from './components/Footer'
+import RequireRole from './components/RequireRole'
+import { Button } from './components/ui'
+import usePwaIdentity from './hooks/usePwaIdentity'
+import Home from './pages/Home'
+import Rooms from './pages/Rooms'
+import Amenities from './pages/Amenities'
+import Location from './pages/Location'
+import Login from './pages/Login'
+import Signup from './pages/Signup'
+import Book from './pages/Book'
+import Account from './pages/Account'
+import { Privacy, Terms } from './pages/Legal'
+import StaffDashboard from './pages/staff/StaffDashboard'
+import AdminDashboard from './pages/admin/AdminDashboard'
 
-function Section({ id, title, children }) {
+// New page -> top. Link with a #hash -> scroll to that section once it has rendered.
+function ScrollManager() {
+  const { pathname, hash } = useLocation()
+  useEffect(() => {
+    if (!hash) {
+      window.scrollTo({ top: 0 })
+      return undefined
+    }
+    const t = setTimeout(() => document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: 'smooth' }), 50)
+    return () => clearTimeout(t)
+  }, [pathname, hash])
+  return null
+}
+
+function PublicLayout() {
   return (
-    <section id={id} className="scroll-mt-16 py-14 text-navy">
-      <div className="mx-auto max-w-6xl px-4">
-        <h2 className="text-2xl font-bold md:text-3xl">{title}</h2>
-        <div className="mt-6">{children}</div>
-      </div>
-    </section>
+    <div className="flex min-h-screen flex-col bg-cream">
+      <Navbar />
+      <main className="flex flex-1 flex-col"><Outlet /></main>
+      <Footer />
+    </div>
   )
 }
 
-function Home({ scrollTo }) {
-  return (
-    <>
-      <Hero scrollTo={scrollTo} />
-
-      <Section id="amenities" title="Amenities">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {amenities.map((a) => (
-            <div key={a.title} className="rounded-2xl border border-navy/10 bg-white p-5">
-              <p className="text-2xl" aria-hidden="true">{a.icon}</p>
-              <h3 className="mt-2 font-semibold">{a.title}</h3>
-              <p className="mt-1 text-sm text-slate-600">{a.text}</p>
-            </div>
-          ))}
-        </div>
-      </Section>
-
-      <Section id="stays" title="Stays">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {categories.map((c) => {
-            const list = rooms.filter((r) => r.category === c.id)
-            const count = list.length
-            // No category photos yet: use the first room's photo (public/images/rooms/<id>.webp)
-            const photo = list[0] ? `/images/rooms/${list[0].id}.webp` : `/images/categories/${c.id}.jpg`
-            return (
-              <div key={c.id} className="overflow-hidden rounded-2xl border border-navy/10 bg-white">
-                <Img src={photo} alt={c.name} className="h-40 w-full object-cover" />
-                <div className="p-4">
-                  <h3 className="font-semibold">{c.name}</h3>
-                  <p className="text-sm font-medium text-gold-deep">{c.tag}</p>
-                  <p className="mt-1 text-xs text-slate-500">{count} room{count === 1 ? '' : 's'} listed</p>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </Section>
-
-      <Section id="location" title="Location">
-        <p className="text-slate-600">{brand.address}</p>
-        <iframe
-          title="YOLO Nest on Google Maps"
-          className="mt-4 h-80 w-full rounded-2xl border border-navy/10"
-          loading="lazy"
-          src={`https://maps.google.com/maps?q=${encodeURIComponent(brand.mapQuery)}&output=embed`}
-        />
-      </Section>
-
-      <Section id="contact" title="Contact">
-        <a href={`tel:+91${brand.phone}`} className="inline-block rounded-full bg-navy px-6 py-3 font-semibold text-white">
-          Call {brand.phone}
-        </a>
-      </Section>
-    </>
-  )
+// Staff and admin apps have no public navbar or footer: they open straight into the dashboard.
+function AppLayout() {
+  return <main className="min-h-screen bg-cream"><Outlet /></main>
 }
 
-function Placeholder({ title, go }) {
+function NotFound() {
   return (
     <div className="mx-auto max-w-md px-4 py-20 text-center text-navy">
-      <h1 className="text-2xl font-bold">{title}</h1>
-      <p className="mt-2 text-slate-600">Coming soon.</p>
-      <button onClick={() => go('home')} className="mt-6 rounded-full bg-sun px-6 py-2 font-semibold">Back home</button>
+      <h1 className="text-2xl font-bold">Page not found</h1>
+      <p className="mt-2 text-slate-600">That page does not exist.</p>
+      <Button to="/" variant="sun" className="mt-6">Back home</Button>
     </div>
   )
 }
 
 export default function App() {
-  const [page, setPage] = useState('home')
-  const [user, setUser] = useState(null)
-
-  const go = (p) => {
-    setPage(p)
-    window.scrollTo({ top: 0 })
-  }
-
-  const scrollTo = (id) => {
-    if (page !== 'home') setPage('home')
-    requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' }))
-  }
-
+  usePwaIdentity()
   return (
-    <div className="flex min-h-screen flex-col bg-cream">
-      <Navbar user={user} go={go} scrollTo={scrollTo} logout={() => { setUser(null); go('home') }} />
-      <main className="flex flex-1 flex-col">
-        {page === 'home' && <Home scrollTo={scrollTo} />}
-        {page === 'login' && <Placeholder title="Log in" go={go} />}
-        {page === 'dashboard' && <Placeholder title="Dashboard" go={go} />}
-      </main>
-    </div>
+    <>
+      <ScrollManager />
+      <Routes>
+        <Route element={<PublicLayout />}>
+          <Route index element={<Home />} />
+          <Route path="rooms" element={<Rooms />} />
+          <Route path="amenities" element={<Amenities />} />
+          <Route path="location" element={<Location />} />
+          <Route path="login" element={<Login audience="customer" />} />
+          <Route path="signup" element={<Signup />} />
+          <Route path="book/:roomId" element={<Book />} />
+          <Route path="privacy" element={<Privacy />} />
+          <Route path="terms" element={<Terms />} />
+          <Route path="account" element={<RequireRole roles={['customer']} loginPath="/login"><Account /></RequireRole>} />
+          <Route path="*" element={<NotFound />} />
+        </Route>
+
+        <Route element={<AppLayout />}>
+          <Route path="staff/login" element={<Login audience="employee" />} />
+          <Route path="staff" element={<RequireRole roles={['employee', 'admin']} loginPath="/staff/login"><StaffDashboard /></RequireRole>} />
+          <Route path="admin/login" element={<Login audience="admin" />} />
+          <Route path="admin" element={<RequireRole roles={['admin']} loginPath="/admin/login"><AdminDashboard /></RequireRole>} />
+        </Route>
+      </Routes>
+    </>
   )
 }
