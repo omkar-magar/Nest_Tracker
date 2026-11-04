@@ -1,5 +1,5 @@
 -- Row Level Security. Default is deny: every table has RLS on, and writes that touch money, bookings or
--- roles have NO insert/update/delete policy at all. They go through the security-definer functions in 0003.
+-- roles have NO insert/update/delete policy at all. They go through the security-definer functions in the functions migration.
 
 -- ---------------------------------------------------------------- helpers
 create function public.current_app_role() returns public.app_role

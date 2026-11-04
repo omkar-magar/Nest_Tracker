@@ -7,7 +7,7 @@ supabase start            # prints API URL and anon key
 supabase db reset         # runs supabase/migrations/*.sql, then supabase/seed.sql
 supabase functions serve create-employee
 ```
-Hosted: create a project, then run `0001`..`0004` in `supabase/migrations/` in order in the SQL editor, then `seed.sql`.
+Hosted: create a project, then run the four files in `supabase/migrations/` in order in the SQL editor, then `seed.sql`.
 Deploy the function: `supabase functions deploy create-employee`.
 
 ## 2. Environment (`.env.local`, see `.env.example`)
@@ -33,10 +33,10 @@ In Auth settings decide whether email confirmation is required; signup handles b
 ## 4. Database
 | File | Contents |
 |---|---|
-| `0001_schema.sql` | tables, constraints, indexes, signup trigger, bed-occupancy trigger |
-| `0002_rls.sql` | RLS on every table, column grants, realtime publication (`beds`, `rooms` only) |
-| `0003_functions.sql` | `book_room`, `cancel_booking`, payment functions, staff and admin RPCs |
-| `0004_storage.sql` | buckets `customer-documents` (private, `<user_id>/…`) and `room-images` (public read, admin write) |
+| `20261104000001_schema.sql` | tables, constraints, indexes, signup trigger, bed-occupancy trigger |
+| `20261104000002_rls.sql` | RLS on every table, column grants, realtime publication (`beds`, `rooms` only) |
+| `20261104000003_functions.sql` | `book_room`, `cancel_booking`, payment functions, staff and admin RPCs |
+| `20261104000004_storage.sql` | buckets `customer-documents` (private, `<user_id>/…`) and `room-images` (public read, admin write) |
 
 Key rules: customers read only their own rows; employees get customer data only through `staff_customer_overview()`, trimmed by their permission switches (`employee_permissions`); roles cannot be changed from the client; payments/bookings/bills have no client write policies.
 Double booking: `book_room` locks the room row, and a unique index allows one active `booking_beds` row per bed. Unpaid holds expire after 30 minutes (`app_settings.hold_minutes`).

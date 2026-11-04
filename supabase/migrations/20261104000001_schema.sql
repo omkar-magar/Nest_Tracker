@@ -17,7 +17,7 @@ create table public.profiles (
   created_at  timestamptz not null default now()
 );
 
--- Per-employee switches, enforced in RLS / RPCs (see 0002 + 0003). Admin ignores this table.
+-- Per-employee switches, enforced in RLS / RPCs (see the rls and functions migrations). Admin ignores this table.
 create table public.employee_permissions (
   employee_id             uuid primary key references public.profiles (id) on delete cascade,
   can_view_customers      boolean not null default true,   -- names, rooms, due dates
