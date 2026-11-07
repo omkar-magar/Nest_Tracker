@@ -2,7 +2,7 @@ export const brand = {
   name: 'YOLO Nest',
   tagline: 'Live Better, Live Together.',
   phone: '8483878098',
-  address: 'Near Hirai Sitai Mandir, Parkhe Vasti, Hinjewadi Phase 1',
+  address: 'Near Hirai Sitai Mandir, Parkhe Vasti, Hinjewadi Phase 1, Pune 411057',
   mapQuery: 'Hirai Sitai Mandir Parkhe Vasti Hinjewadi Phase 1 Pune',
   // Add real links like { label: 'Instagram', href: 'https://...' }. The footer hides this block while it is empty.
   social: [],
@@ -23,7 +23,23 @@ export const amenities = [
   { icon: '🏓', title: 'Pickleball court', text: 'Play a game after work without leaving the building.', image: '/images/hero/pickleball.webp' },
   { icon: '☕', title: 'Chill café area', text: 'A relaxed corner for coffee, work calls and conversation.', image: '/images/hero/cafe.webp' },
   { icon: '💂', title: 'Security guard', text: 'Guard on duty so you and your belongings stay safe.' },
+  { icon: '🍳', title: 'Self-cooking kitchen', text: 'Cook your own meals with induction stoves, a microwave and a fridge, plus 24x7 RO water.' },
+  { icon: '📶', title: 'High-speed Wi-Fi', text: 'Included in your rent, for work calls and streaming.' },
+  { icon: '🧺', title: 'Laundry station', text: 'Wash your clothes without leaving the building.' },
+  { icon: '📹', title: 'CCTV & biometric entry', text: 'Monitored common areas and controlled entry to the building.' },
 ]
+
+// "Why choose us" cards on the home page.
+export const highlights = [
+  { icon: '🤝', title: 'Zero brokerage', text: 'Deal directly with the owner. No broker and no brokerage fee.' },
+  { icon: '🍳', title: 'Self-cooking kitchen', text: 'Induction, microwave and fridge, so you are not tied to mess food.' },
+  { icon: '📶', title: 'Wi-Fi and housekeeping', text: 'Both come with your monthly rent, along with power backup.' },
+  { icon: '🏓', title: 'Gym and pickleball', text: 'Stay active with a gym, a pickleball court and a gaming lounge.' },
+]
+
+// Options in the "Schedule a visit" form on the home page.
+export const visitTypes = ['In-person guided visit', 'Virtual video tour']
+export const visitSlots = ['10:00 AM – 12:00 PM', '12:00 PM – 2:00 PM', '2:00 PM – 4:00 PM', '4:00 PM – 6:00 PM', '6:00 PM – 8:00 PM']
 
 // Image for each category: public/images/categories/<id>.jpg
 export const categories = [
@@ -53,11 +69,16 @@ export const rooms = [
 export const faqs = [
   { group: 'Booking', q: 'How do I book a bed or room?', a: 'Create a customer account, open Rooms, pick a room with free beds and choose your dates. Your beds are held for 30 minutes while you pay the first bills from your dashboard.' },
   { group: 'Booking', q: 'What if I do not pay within the hold time?', a: 'The hold is released and the beds go back on sale. You can book again at any time.' },
+  { group: 'Booking', q: 'Is there a minimum stay on monthly rooms?', a: 'Yes. Monthly stays have a 3-month lock-in and need 30 days\' notice before you leave. Shorter terms may be possible for corporate projects, so call us to ask.' },
+  { group: 'Booking', q: 'What documents do I need to move in?', a: 'A government photo ID (Aadhaar, passport or Voter ID), permanent address proof, a recent passport-size photo, an employee ID or offer letter (or college ID for students), and an emergency contact.' },
+  { group: 'Payments', q: 'What does the monthly rent include?', a: 'Your furnished room or flat, high-speed Wi-Fi, housekeeping, gym and gaming zone access, power backup for essentials and lifts, and 24x7 purified water. Meals are not provided, but you can cook in the kitchen.' },
   { group: 'Payments', q: 'How do I pay?', a: 'Bills appear in your dashboard with a due date. Pay each one online from there. Your payment history and outstanding balance are always visible.' },
   { group: 'Payments', q: 'When is rent due?', a: 'For monthly stays, the next month\'s bill is created as soon as the current one is paid. Overdue bills are marked in your dashboard.' },
   { group: 'Security deposits', q: 'Is there a security deposit?', a: 'Monthly rooms carry a security deposit, shown on each room before you book. Nightly stays do not need one.' },
+  { group: 'Security deposits', q: 'How do I get my deposit back?', a: 'It is refunded at checkout if you have completed the lock-in, given 30 days\' notice, cleared all dues and caused no damage. Refunds are processed within 7 bank working days.' },
+  { group: 'House rules', q: 'Can friends or family visit?', a: 'Yes. Visitors can use the ground floor lounge and reception from 9:00 AM to 8:00 PM. Overnight guests are not allowed in sharing rooms.' },
   { group: 'Accommodation', q: 'What is the difference between bed-wise and whole-room stays?', a: 'PG rooms are rented per bed and shared. Flats, lodge rooms and the Airbnb-style stay are rented as a whole room, so one booking takes every bed.' },
-  { group: 'Amenities', q: 'What facilities can residents use?', a: 'A gym, gaming zone, pickleball court and café area, with a security guard on duty. See the Amenities page for photos.' },
+  { group: 'Amenities', q: 'What facilities can residents use?', a: 'A gym, gaming zone, pickleball court, café area, self-cooking kitchen and laundry station, with CCTV and a security guard on duty. See the Amenities page for details.' },
   { group: 'Check-in and check-out', q: 'How do I choose my check-in and check-out dates?', a: 'You pick them while booking. Nightly stays need both dates. For early or late arrival, call us.' },
   { group: 'Cancellation', q: 'Can I cancel a booking?', a: 'You can cancel an unpaid hold yourself from your dashboard. For a paid stay, contact the PG office and we will help you.' },
 ]
