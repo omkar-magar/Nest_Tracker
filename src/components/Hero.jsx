@@ -132,7 +132,7 @@ export default function Hero({ scrollTo }) {
                 className={`hero-slice fade-mask absolute inset-0 ${isActive ? 'is-active z-10' : ''} ${dim ? 'is-dim' : ''}`}
               >
                 <Img src={a.src} alt="" className="h-full w-full object-cover" />
-                <div className="absolute inset-0 bg-gradient-to-t from-navy/90 via-navy/20 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-navy/60 via-navy/5 to-transparent" />
               </div>
             )
           })}
@@ -146,7 +146,7 @@ export default function Hero({ scrollTo }) {
               onAnimationEnd={() => setLeaving(null)}
             >
               <Img src={amenities[leaving].src} alt="" className="h-full w-full object-cover" />
-              <div className="absolute inset-0 bg-gradient-to-t from-navy/90 via-navy/20 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-navy/60 via-navy/5 to-transparent" />
             </div>
           )}
 

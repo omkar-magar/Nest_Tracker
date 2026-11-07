@@ -25,7 +25,7 @@
   clip-path: inset(0);
   animation: slice-in 1s ease-out; /* hovered photo shows at once, then eases up to full */
 }
-@keyframes slice-in { from { opacity: 0.5; } to { opacity: 1; } }
+@keyframes slice-in { from { opacity: 0.8; } to { opacity: 1; } }
 .hero-leave { animation: slice-out 0.5s ease-in-out forwards; }
 @keyframes slice-out { from { opacity: 1; } to { opacity: 0; } }
 @media (min-width: 768px) {
@@ -38,8 +38,8 @@
 /* Soft transparent fade instead of a hard edge: right edge on mobile, top edge from md up.
    The mask is 4x the box; the active photo moves it so the fade disappears. */
 .fade-mask {
-  -webkit-mask-image: linear-gradient(to right, #000 75%, transparent 100%);
-  mask-image: linear-gradient(to right, #000 75%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, #000 94%, transparent 100%);
+  mask-image: linear-gradient(to right, #000 94%, transparent 100%);
   -webkit-mask-size: 400% 100%;
   mask-size: 400% 100%;
   -webkit-mask-repeat: no-repeat;
@@ -50,8 +50,8 @@
 .fade-mask.is-active { -webkit-mask-position: 0 0; mask-position: 0 0; }
 @media (min-width: 768px) {
   .fade-mask {
-    -webkit-mask-image: linear-gradient(to top, #000 75%, transparent 100%);
-    mask-image: linear-gradient(to top, #000 75%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to top, #000 90%, transparent 100%);
+    mask-image: linear-gradient(to top, #000 90%, transparent 100%);
     -webkit-mask-size: 100% 400%;
     mask-size: 100% 400%;
     -webkit-mask-position: 0 0;
