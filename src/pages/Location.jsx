@@ -1,9 +1,9 @@
 import Img from '../components/Img'
 import { Button, Card, PageHeader } from '../components/ui'
 import { brand, nearby } from '../data/site'
+import { mapsUrl } from '../services/contact'
 
 const mapSrc = `https://maps.google.com/maps?q=${encodeURIComponent(brand.mapQuery)}&output=embed`
-const directions = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(brand.mapQuery)}`
 
 export default function Location() {
   const metro = nearby.find((n) => n.icon === 'metro')
@@ -25,7 +25,7 @@ export default function Location() {
             <h2 className="font-semibold">Address</h2>
             <p className="mt-1 text-slate-600">{brand.address}</p>
             <div className="mt-4 flex flex-wrap gap-2">
-              <Button variant="primary" href={directions} target="_blank" rel="noreferrer">Get directions</Button>
+              <Button variant="primary" href={mapsUrl} target="_blank" rel="noreferrer">Get directions</Button>
               <Button variant="outline" href={`tel:+91${brand.phone}`}>Call {brand.phone}</Button>
             </div>
             <h2 className="mt-6 font-semibold">Getting around</h2>

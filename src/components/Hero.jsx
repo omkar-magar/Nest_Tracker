@@ -92,12 +92,20 @@ export default function Hero({ scrollTo }) {
             close to Hinjewadi's IT parks and the metro.
           </p>
           <p className="mt-2 font-semibold text-gold-deep">{brand.tagline}</p>
-          <button
-            onClick={() => scrollTo('stays')}
-            className="mt-6 w-full rounded-full bg-sun px-6 py-3 font-semibold text-navy shadow-sm transition hover:brightness-95 sm:w-auto"
-          >
-            See available stays
-          </button>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+            <button
+              onClick={() => scrollTo('rooms-preview')}
+              className="w-full rounded-full bg-sun px-6 py-3 font-semibold text-navy shadow-sm transition hover:brightness-95 sm:w-auto"
+            >
+              See available stays
+            </button>
+            <button
+              onClick={() => scrollTo('contact')}
+              className="w-full rounded-full border border-navy/30 bg-white/70 px-6 py-3 font-semibold text-navy transition hover:bg-white sm:w-auto"
+            >
+              Schedule a visit
+            </button>
+          </div>
         </div>
 
         {/* Nearby map: sits between heading and amenities on mobile */}

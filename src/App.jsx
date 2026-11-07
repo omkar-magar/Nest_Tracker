@@ -2,6 +2,8 @@ import { Suspense, lazy, useEffect } from 'react'
 import { Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
+import QuickContactBar from './components/QuickContactBar'
+import FloatingShortcuts from './components/FloatingShortcuts'
 import RequireRole from './components/RequireRole'
 import { Button, Spinner } from './components/ui'
 import usePwaIdentity from './hooks/usePwaIdentity'
@@ -39,6 +41,8 @@ function PublicLayout() {
       <Navbar />
       <main className="flex flex-1 flex-col"><Suspense fallback={<Spinner />}><Outlet /></Suspense></main>
       <Footer />
+      <QuickContactBar />
+      <FloatingShortcuts />
     </div>
   )
 }
