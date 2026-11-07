@@ -1,7 +1,11 @@
+import { memo } from 'react'
 import Img from './Img'
 import { Badge, Button } from './ui'
 import { availability, priceLabel } from '../services/catalog'
 import { rupees } from '../services/format'
+
+// Start downloading the (lazy) booking page as soon as someone points at the button
+const prefetchBook = () => import('../pages/Book')
 
 const STATUS = {
   available: { tone: 'green', text: 'Available' },
@@ -16,7 +20,8 @@ export function AvailabilityBadge({ room }) {
   return <Badge tone={STATUS[a.status].tone}>{STATUS[a.status].text}</Badge>
 }
 
-export default function RoomCard({ room, categoryName }) {
+// memo: the list re-renders on every availability update, but only the rooms that changed need redrawing
+function RoomCard({ room, categoryName }) {
   const a = availability(room)
   const occupancy =
     a.status === 'unknown'
@@ -51,10 +56,12 @@ export default function RoomCard({ room, categoryName }) {
           {a.bookable === false ? (
             <Button variant="outline" className="w-full" disabled>{a.status === 'unavailable' ? 'Unavailable' : 'Fully booked'}</Button>
           ) : (
-            <Button variant="sun" className="w-full" to={`/book/${room.id}`}>Book this room</Button>
+            <Button variant="sun" className="w-full" to={`/book/${room.id}`} onPointerEnter={prefetchBook} onFocus={prefetchBook}>Book this room</Button>
           )}
         </div>
       </div>
     </article>
   )
 }
+
+export default memo(RoomCard)

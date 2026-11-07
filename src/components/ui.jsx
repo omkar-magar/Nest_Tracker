@@ -24,6 +24,42 @@ export function Spinner({ label = 'Loading' }) {
   )
 }
 
+// Placeholders that match the final layout, so the page does not jump when data arrives.
+// They keep role="status" and a text label for screen readers.
+export function CardGridSkeleton({ count = 3, label = 'Loading' }) {
+  return (
+    <div role="status" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <span className="sr-only">{label}…</span>
+      {Array.from({ length: count }, (_, i) => (
+        <div key={i} aria-hidden="true" className="animate-pulse overflow-hidden rounded-2xl border border-navy/10 bg-white">
+          <div className="h-44 bg-navy/5" />
+          <div className="space-y-3 p-4">
+            <div className="h-4 w-1/3 rounded bg-navy/10" />
+            <div className="h-6 w-1/2 rounded bg-navy/10" />
+            <div className="h-3 w-2/3 rounded bg-navy/5" />
+            <div className="h-10 rounded-full bg-navy/5" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export function TableSkeleton({ rows = 5, label = 'Loading' }) {
+  return (
+    <div role="status" className="overflow-hidden rounded-2xl border border-navy/10 bg-white">
+      <span className="sr-only">{label}…</span>
+      {Array.from({ length: rows }, (_, i) => (
+        <div key={i} aria-hidden="true" className="flex animate-pulse gap-4 border-b border-navy/5 px-4 py-4 last:border-0">
+          <div className="h-4 w-1/4 rounded bg-navy/10" />
+          <div className="h-4 w-1/6 rounded bg-navy/5" />
+          <div className="h-4 flex-1 rounded bg-navy/5" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function ErrorBox({ error, onRetry }) {
   if (!error) return null
   return (

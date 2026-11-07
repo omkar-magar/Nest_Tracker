@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { invalidate } from '../lib/queryCache'
 
 // Thin wrappers over Supabase. Each throws on error so callers can show it; nothing is swallowed here.
 const unwrap = ({ data, error }) => {
@@ -6,13 +7,17 @@ const unwrap = ({ data, error }) => {
   return data
 }
 
+// Anything that changes beds or room prices must drop the cached public catalogue, so Rooms / Book never show old availability.
+const freshCatalog = (result) => { invalidate('catalog'); return result }
+
 // ---------------------------------------------------------------- customer
 export const bookRoom = ({ roomId, bedCount, checkIn, checkOut }) =>
   supabase
     .rpc('book_room', { p_room_id: roomId, p_bed_count: bedCount, p_check_in: checkIn, p_check_out: checkOut || null })
     .then(unwrap)
+    .then(freshCatalog)
 
-export const cancelBooking = (id) => supabase.rpc('cancel_booking', { p_booking_id: id }).then(unwrap)
+export const cancelBooking = (id) => supabase.rpc('cancel_booking', { p_booking_id: id }).then(unwrap).then(freshCatalog)
 
 export async function loadMyAccount(userId) {
   const [bookings, bills, payments, documents, review] = await Promise.all([
@@ -72,21 +77,27 @@ export const loadBeds = () =>
   supabase.from('rooms').select('id, room_no, floor, ac_type, rent_basis, category_id, beds(id, label, status, is_occupied)')
     .eq('is_active', true).order('room_no').then(unwrap)
 
-export const setBedStatus = (bedId, status) => supabase.rpc('set_bed_status', { p_bed_id: bedId, p_status: status }).then(unwrap)
+export const setBedStatus = (bedId, status) =>
+  supabase.rpc('set_bed_status', { p_bed_id: bedId, p_status: status }).then(unwrap).then(freshCatalog)
 
 // ---------------------------------------------------------------- admin
 export const adminStats = () => supabase.rpc('admin_dashboard_stats').then(unwrap)
 
-export const adminCustomers = () =>
+// 30 customers per page (newest first); the dashboard asks for the next page with "Load more".
+export const CUSTOMERS_PAGE = 30
+export const adminCustomers = (page = 0) =>
   supabase.from('profiles').select(`
     id, full_name, phone, is_active, created_at,
     bookings(id, status, check_in, check_out, rooms(room_no), booking_beds(active, beds(label))),
     bills(id, amount, status, due_date, description),
     customer_documents(id, doc_type, file_name, file_path)
-  `).eq('role', 'customer').order('created_at', { ascending: false }).then(unwrap)
+  `).eq('role', 'customer').order('created_at', { ascending: false })
+    .range(page * CUSTOMERS_PAGE, (page + 1) * CUSTOMERS_PAGE - 1).then(unwrap)
 
+// Unpaid bills only: that is all the Dues screen shows, and paid bills pile up every month.
 export const adminBills = () =>
-  supabase.from('bills').select('*, profiles(full_name, phone), bookings(rooms(room_no))').order('due_date').then(unwrap)
+  supabase.from('bills').select('id, description, amount, due_date, status, profiles(full_name, phone), bookings(rooms(room_no))')
+    .eq('status', 'unpaid').order('due_date').then(unwrap)
 
 export const adminPayments = () =>
   supabase.from('payments').select('*, profiles(full_name), bills(description)').order('created_at', { ascending: false }).limit(200).then(unwrap)
@@ -98,11 +109,12 @@ export const adminEmployees = () =>
 export const adminActivity = () =>
   supabase.from('activity_log').select('*, profiles(full_name)').order('created_at', { ascending: false }).limit(100).then(unwrap)
 
-export const adminReviews = () => supabase.from('reviews').select('*').order('created_at', { ascending: false }).then(unwrap)
-export const setReviewStatus = (id, status) => supabase.from('reviews').update({ status }).eq('id', id).then(unwrap)
+export const adminReviews = () => supabase.from('reviews').select('*').order('created_at', { ascending: false }).limit(100).then(unwrap)
+export const setReviewStatus = (id, status) =>
+  supabase.from('reviews').update({ status }).eq('id', id).then(unwrap).then((r) => { invalidate('reviews'); return r })
 
 export const recordCashPayment = (billId) => supabase.rpc('admin_record_cash_payment', { p_bill_id: billId }).then(unwrap)
-export const endBooking = (id) => supabase.rpc('admin_end_booking', { p_booking_id: id }).then(unwrap)
+export const endBooking = (id) => supabase.rpc('admin_end_booking', { p_booking_id: id }).then(unwrap).then(freshCatalog)
 export const setUserActive = (id, active) => supabase.rpc('admin_set_user_active', { p_user: id, p_active: active }).then(unwrap)
 export const setEmployeePermissions = (id, perms) =>
   supabase.rpc('admin_set_employee_permissions', { p_employee: id, p_perms: perms }).then(unwrap)
@@ -118,4 +130,4 @@ export async function createEmployee(fields) {
   return data
 }
 
-export const updateRoom = (id, fields) => supabase.from('rooms').update(fields).eq('id', id).then(unwrap)
+export const updateRoom = (id, fields) => supabase.from('rooms').update(fields).eq('id', id).then(unwrap).then(freshCatalog)

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import useAsync from '../hooks/useAsync'
+import useQuery from '../hooks/useQuery'
 import { loadPublishedReviews } from '../services/catalog'
 import { formatDate } from '../services/format'
 import { Empty, ErrorBox, Spinner } from './ui'
@@ -12,7 +12,7 @@ const Stars = ({ n }) => (
 
 // Shows only reviews a real customer wrote and the owner published. Nothing is pre-filled.
 export default function Reviews() {
-  const { data, error, loading, reload } = useAsync(loadPublishedReviews, [])
+  const { data, error, loading, reload } = useQuery('reviews', loadPublishedReviews, { staleTime: 2 * 60_000 })
 
   if (loading) return <Spinner label="Loading reviews" />
   if (error) return <ErrorBox error={error} onRetry={reload} />

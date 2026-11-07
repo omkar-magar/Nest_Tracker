@@ -1,10 +1,10 @@
 import Img from '../components/Img'
 import { Button, ErrorBox, PageHeader, Spinner } from '../components/ui'
-import useAsync from '../hooks/useAsync'
-import { loadCatalog } from '../services/catalog'
+import useQuery from '../hooks/useQuery'
+import { loadAmenities } from '../services/catalog'
 
 export default function Amenities() {
-  const { data, error, loading, reload } = useAsync(loadCatalog, [])
+  const { data, error, loading, reload } = useQuery('amenities', loadAmenities, { staleTime: 5 * 60_000 })
   return (
     <>
       <PageHeader title="Amenities" intro="Everything residents can use at YOLO Nest. Photos are of the actual facilities in our building." />

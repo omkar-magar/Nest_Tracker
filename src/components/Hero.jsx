@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Img from './Img'
 import NearbyMap from './NearbyMap'
+import useMediaQuery from '../hooks/useMediaQuery'
 import { brand } from '../data/site'
 
 // Replace the image paths and text with your real amenities.
@@ -14,6 +15,7 @@ const amenities = [
 export default function Hero({ scrollTo }) {
   const [active, setActive] = useState(null) // null = all equal
   const [leaving, setLeaving] = useState(null) // photo fading out over the restored slices
+  const wide = useMediaQuery('(min-width: 1024px)') // lg: only the background for this size is downloaded
 
   const show = (idx) => {
     setLeaving(null)
@@ -40,28 +42,30 @@ export default function Hero({ scrollTo }) {
 
   return (
     <section id="home" className="relative flex flex-1 flex-col justify-center overflow-hidden bg-cream text-navy">
-      {/* Mobile background: public/images/background/mbg.jpg */}
-      <img
+      {/* Mobile background: public/images/background/mbg.jpg. Decorative, so it never competes with the text. */}
+      {!wide && <img
         aria-hidden="true"
         src="/images/background/mbg.jpg"
         alt=""
         loading="eager"
+        fetchPriority="low"
         decoding="async"
-        className="pointer-events-none absolute inset-0 h-full w-full object-cover object-center opacity-40 grayscale lg:hidden"
+        className="pointer-events-none absolute inset-0 h-full w-full object-cover object-center opacity-40"
         style={{
           maskImage: "linear-gradient(180deg, transparent 0%, #000 35%)",
           WebkitMaskImage: "linear-gradient(180deg, transparent 0%, #000 35%)",
         }}
-      />
+      />}
 
       {/* Background: faded aerial photo on the right, behind the 3D map */}
-      <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 hidden w-1/2 lg:block">
+      {wide && <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 w-1/2">
         <img
           src="/images/hero/bg.webp"
           alt=""
           loading="eager"
+          fetchPriority="low"
           decoding="async"
-          className="h-full w-full object-cover object-center opacity-40 grayscale"
+          className="h-full w-full object-cover object-center opacity-40"
           style={{
             maskImage: 'linear-gradient(90deg, transparent 0%, #000 45%), linear-gradient(180deg, transparent 0%, #000 35%)',
             maskComposite: 'intersect',
@@ -69,7 +73,7 @@ export default function Hero({ scrollTo }) {
             WebkitMaskComposite: 'source-in',
           }}
         />
-      </div>
+      </div>}
 
       {/* Content: relative so it stays above the background */}
       <div className="relative mx-auto grid w-full max-w-6xl gap-x-8 gap-y-6 px-4 py-8 md:py-10 lg:grid-cols-5">

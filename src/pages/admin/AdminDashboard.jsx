@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import useAsync from '../../hooks/useAsync'
 import Shell from '../../components/dashboard/Shell'
 import RoomsBoard from '../../components/dashboard/RoomsBoard'
 import ContactButtons from '../../components/dashboard/ContactButtons'
-import { Badge, Button, Card, Empty, ErrorBox, Field, Notice, Spinner, Stat, Table, inputCls } from '../../components/ui'
+import { Badge, Button, Card, Empty, ErrorBox, Field, Notice, Stat, Table, TableSkeleton, inputCls } from '../../components/ui'
 import { daysOverdue, isOverdue } from '../../services/billing'
 import { formatDate, formatDateTime, rupees } from '../../services/format'
 import { loadCatalog } from '../../services/catalog'
@@ -12,7 +12,7 @@ import * as api from '../../services/api'
 // Runs a loader and renders loading / error / content. Keeps each panel short.
 function Panel({ loader, deps = [], children }) {
   const state = useAsync(loader, deps)
-  if (state.loading) return <Spinner />
+  if (state.loading) return <TableSkeleton />
   if (state.error) return <ErrorBox error={state.error} onRetry={state.reload} />
   return children(state.data, state.reload)
 }
@@ -94,15 +94,47 @@ function CustomerRow({ c }) {
   )
 }
 
+// One page of customers at a time (api.CUSTOMERS_PAGE); "Load more" appends the next page.
 function Customers() {
+  const [pages, setPages] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [done, setDone] = useState(false)
+
+  const loadPage = useCallback(async (n) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const rows = await api.adminCustomers(n)
+      setPages((p) => [...p.slice(0, n), rows])
+      setDone(rows.length < api.CUSTOMERS_PAGE)
+    } catch (e) {
+      setError(e)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { loadPage(0) }, [loadPage])
+
+  const rows = pages.flat()
+  if (!rows.length) {
+    if (loading) return <TableSkeleton label="Loading customers" />
+    if (error) return <ErrorBox error={error} onRetry={() => loadPage(0)} />
+    return <Empty title="No customers yet" />
+  }
   return (
-    <Panel loader={api.adminCustomers}>
-      {(rows) => rows.length === 0 ? <Empty title="No customers yet" /> : (
-        <Table head={['Name', 'Room', 'Booking', 'Outstanding', 'Contact', '']}>
-          {rows.map((c) => <CustomerRow key={c.id} c={c} />)}
-        </Table>
+    <div className="space-y-4">
+      <Table head={['Name', 'Room', 'Booking', 'Outstanding', 'Contact', '']}>
+        {rows.map((c) => <CustomerRow key={c.id} c={c} />)}
+      </Table>
+      <ErrorBox error={error} onRetry={() => loadPage(pages.length)} />
+      {!done && (
+        <div className="text-center">
+          <Button variant="outline" disabled={loading} onClick={() => loadPage(pages.length)}>{loading ? 'Loading…' : 'Load more'}</Button>
+        </div>
       )}
-    </Panel>
+    </div>
   )
 }
 

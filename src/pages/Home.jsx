@@ -4,14 +4,14 @@ import Img from '../components/Img'
 import RoomCard from '../components/RoomCard'
 import Reviews from '../components/Reviews'
 import Faq from '../components/Faq'
-import { Button, ErrorBox, Section, Spinner } from '../components/ui'
+import { Button, CardGridSkeleton, ErrorBox, Section } from '../components/ui'
 import useCatalog from '../hooks/useCatalog'
 import { previewRooms } from '../services/catalog'
 import { brand, categories, rooms as staticRooms } from '../data/site'
 
 function RoomPreview() {
   const { data, error, loading, reload } = useCatalog()
-  if (loading) return <Spinner label="Loading rooms" />
+  if (loading) return <CardGridSkeleton label="Loading rooms" />
   if (error) return <ErrorBox error={error} onRetry={reload} />
   const names = Object.fromEntries(data.categories.map((c) => [c.id, c.name]))
   return (

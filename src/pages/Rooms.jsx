@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import RoomCard from '../components/RoomCard'
-import { Empty, ErrorBox, Notice, PageHeader, Spinner, inputCls } from '../components/ui'
+import { CardGridSkeleton, Empty, ErrorBox, Notice, PageHeader, inputCls } from '../components/ui'
 import useCatalog from '../hooks/useCatalog'
 import { availability, monthlyEquivalent } from '../services/catalog'
 
@@ -42,7 +42,7 @@ export default function Rooms() {
     <>
       <PageHeader title="Rooms" intro="Every room with its price, beds and live availability. Availability updates by itself, no refresh needed." />
       <div className="mx-auto w-full max-w-6xl px-4 py-8 text-navy">
-        {loading && <Spinner label="Loading rooms" />}
+        {loading && <CardGridSkeleton label="Loading rooms" />}
         <ErrorBox error={error} onRetry={reload} />
         {data && (
           <>

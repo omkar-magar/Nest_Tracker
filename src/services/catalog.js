@@ -33,29 +33,36 @@ function fromStatic(r) {
   }
 }
 
+// Only the columns the UI reads: keeps responses small as the tables grow.
+const ROOM_COLS = 'id, category_id, room_no, floor, ac_type, description, features, image_url, rent_basis, billing_period, price, deposit, is_active, is_demo_price'
+
+// Categories, rooms and bed availability: the part that changes, so useCatalog keeps it fresh.
 export async function loadCatalog() {
   if (!isConfigured) {
-    return {
-      live: false,
-      categories: staticCategories,
-      rooms: staticRooms.map(fromStatic),
-      amenities: staticAmenities.map((a) => ({ id: a.title, title: a.title, text: a.text, icon: a.icon, image: a.image })),
-    }
+    return { live: false, categories: staticCategories, rooms: staticRooms.map(fromStatic) }
   }
-  const [cats, rms, beds, ams] = await Promise.all([
-    supabase.from('categories').select('*').order('sort_order'),
-    supabase.from('rooms').select('*').eq('is_active', true).order('room_no'),
+  const [cats, rms, beds] = await Promise.all([
+    supabase.from('categories').select('id, name, tag').order('sort_order'),
+    supabase.from('rooms').select(ROOM_COLS).eq('is_active', true).order('room_no'),
     supabase.from('beds').select('id, room_id, label, status, is_occupied').order('label'),
-    supabase.from('amenities').select('*').order('sort_order'),
   ])
-  const failed = [cats, rms, beds, ams].find((r) => r.error)
+  const failed = [cats, rms, beds].find((r) => r.error)
   if (failed) throw failed.error
   return {
     live: true,
     categories: cats.data,
     rooms: rms.data.map((r) => fromRow(r, beds.data)),
-    amenities: ams.data.map((a) => ({ id: a.id, title: a.title, text: a.description, icon: a.icon, image: a.image_url })),
   }
+}
+
+// Amenities change rarely and have nothing to do with rooms or beds, so they load on their own (Amenities page).
+export async function loadAmenities() {
+  if (!isConfigured) {
+    return { live: false, amenities: staticAmenities.map((a) => ({ id: a.title, title: a.title, text: a.text, icon: a.icon, image: a.image })) }
+  }
+  const { data, error } = await supabase.from('amenities').select('id, title, description, icon, image_url').order('sort_order')
+  if (error) throw error
+  return { live: true, amenities: data.map((a) => ({ id: a.id, title: a.title, text: a.description, icon: a.icon, image: a.image_url })) }
 }
 
 // Calls back whenever any bed or room row changes. Returns an unsubscribe function.
