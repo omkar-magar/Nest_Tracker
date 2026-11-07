@@ -12,50 +12,43 @@
 }
 
 /* Amenity slices: each photo is clipped to its own slice (column on mobile, row from md up).
-   The active photo shows full size; the others fade out (opacity only, no motion). */
+   They never change; the focused photo fades in over them. */
 .hero-slice {
   clip-path: inset(calc(var(--i) * 100% / var(--n)) 0 calc(100% - (var(--i) + 1) * 100% / var(--n)) 0);
-  transition: none; /* reappearing on exit: instant, .hero-leave covers the change */
 }
-.hero-slice.is-dim {
-  opacity: 0;
-  transition: opacity 0.5s ease-in-out 0.15s; /* disappearing */
-}
-.hero-slice.is-active {
-  clip-path: inset(0);
-  animation: slice-in 1s ease-out; /* hovered photo shows at once, then eases up to full */
-}
-@keyframes slice-in { from { opacity: 0.8; } to { opacity: 1; } }
-.hero-leave { animation: slice-out 0.5s ease-in-out forwards; }
-@keyframes slice-out { from { opacity: 1; } to { opacity: 0; } }
 @media (min-width: 768px) {
   .hero-slice {
     clip-path: inset(0 calc(100% - (var(--i) + 1) * 100% / var(--n)) 0 calc(var(--i) * 100% / var(--n)));
   }
-  .hero-slice.is-active { clip-path: inset(0); }
 }
 
-/* Soft transparent fade instead of a hard edge: right edge on mobile, top edge from md up.
-   The mask is 4x the box; the active photo moves it so the fade disappears. */
-.fade-mask {
-  -webkit-mask-image: linear-gradient(to right, #000 94%, transparent 100%);
-  mask-image: linear-gradient(to right, #000 94%, transparent 100%);
-  -webkit-mask-size: 400% 100%;
-  mask-size: 400% 100%;
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  -webkit-mask-position: 100% 0;
-  mask-position: 100% 0;
+/* Full-size copy of a photo. Only opacity and transform change, so the GPU can run it without repainting.
+   Fading out is slower than fading in, so moving between photos never dips back to the slices. */
+.hero-focus {
+  z-index: 10;
+  opacity: 0;
+  transform: scale(1.05);
+  will-change: opacity, transform;
+  transition: opacity 1s cubic-bezier(0.4, 0, 0.2, 1), transform 1.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
-.fade-mask.is-active { -webkit-mask-position: 0 0; mask-position: 0 0; }
+.hero-focus.is-active {
+  z-index: 11; /* above a photo still fading out */
+  opacity: 1;
+  transform: scale(1);
+  transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1), transform 4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-focus, .hero-focus.is-active { transform: none; transition: opacity 0.2s linear; }
+}
+
+/* Soft transparent fade instead of a hard edge: right edge on mobile, top edge from md up. */
+.fade-mask {
+  -webkit-mask-image: linear-gradient(to right, #000 76%, transparent 100%);
+  mask-image: linear-gradient(to right, #000 76%, transparent 100%);
+}
 @media (min-width: 768px) {
   .fade-mask {
-    -webkit-mask-image: linear-gradient(to top, #000 90%, transparent 100%);
-    mask-image: linear-gradient(to top, #000 90%, transparent 100%);
-    -webkit-mask-size: 100% 400%;
-    mask-size: 100% 400%;
-    -webkit-mask-position: 0 0;
-    mask-position: 0 0;
+    -webkit-mask-image: linear-gradient(to top, #000 60%, transparent 100%);
+    mask-image: linear-gradient(to top, #000 60%, transparent 100%);
   }
-  .fade-mask.is-active { -webkit-mask-position: 0 100%; mask-position: 0 100%; }
 }

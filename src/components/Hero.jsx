@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import Img from './Img'
 import NearbyMap from './NearbyMap'
 import useMediaQuery from '../hooks/useMediaQuery'
+import useFocusTour from '../hooks/useFocusTour'
 import { brand } from '../data/site'
 
 // Replace the image paths and text with your real amenities.
@@ -13,22 +14,19 @@ const amenities = [
 ]
 
 export default function Hero({ scrollTo }) {
-  const [active, setActive] = useState(null) // null = all equal
-  const [leaving, setLeaving] = useState(null) // photo fading out over the restored slices
+  const [active, setActive] = useState(null) // picked by the visitor (hover, focus, tap); null = none
   const wide = useMediaQuery('(min-width: 1024px)') // lg: only the background for this size is downloaded
 
-  const show = (idx) => {
-    setLeaving(null)
-    setActive(idx)
-  }
-  const reset = () => {
-    setLeaving(active)
-    setActive(null)
-  }
+  const show = (idx) => setActive(idx)
+  const reset = () => setActive(null)
 
   // Touch: a photo was already open when the tap started, so this tap closes it
   const wasOpen = useRef(false)
   const panel = useRef(null)
+
+  // The timed tour pauses while the visitor has picked a photo
+  const tour = useFocusTour(amenities.length, panel, active !== null)
+  const focused = active ?? tour // null = all slices equal
 
   // Touch anywhere outside the panel also closes the open photo
   useEffect(() => {
@@ -114,81 +112,75 @@ export default function Hero({ scrollTo }) {
           </div>
         </div>
 
-        {/* Stacked photos: each shows its own slice; hovering one fades the others so it fills the box.
+        {/* Static slices, one per photo, with a full-size copy of each crossfading on top when focused.
             Column on mobile (right edge fades), row from md up (top edge fades). */}
         <div
           ref={panel}
           className="relative h-[28rem] min-w-0 overflow-hidden md:h-80 lg:col-span-3 lg:h-[24rem]"
           onMouseLeave={reset}
         >
-          {amenities.map((a, idx) => {
-            const isActive = idx === active
-            const dim = active !== null && !isActive
-            return (
-              <div
-                key={a.title}
-                aria-hidden="true"
-                style={{ '--i': idx, '--n': amenities.length }}
-                className={`hero-slice fade-mask absolute inset-0 ${isActive ? 'is-active z-10' : ''} ${dim ? 'is-dim' : ''}`}
-              >
-                <Img src={a.src} alt="" className="h-full w-full object-cover" />
-                <div className="absolute inset-0 bg-gradient-to-t from-navy/60 via-navy/5 to-transparent" />
-              </div>
-            )
-          })}
-
-          {/* On exit the slices are back at once; the last photo fades out on top of them */}
-          {leaving !== null && (
+          {amenities.map((a, idx) => (
             <div
-              key={leaving}
+              key={a.title}
               aria-hidden="true"
-              className="hero-leave absolute inset-0 z-10"
-              onAnimationEnd={() => setLeaving(null)}
+              style={{ '--i': idx, '--n': amenities.length }}
+              className="hero-slice fade-mask absolute inset-0"
             >
-              <Img src={amenities[leaving].src} alt="" className="h-full w-full object-cover" />
+              <Img src={a.src} alt="" className="h-full w-full object-cover" />
               <div className="absolute inset-0 bg-gradient-to-t from-navy/60 via-navy/5 to-transparent" />
             </div>
-          )}
+          ))}
+
+          {amenities.map((a, idx) => (
+            <div
+              key={a.title}
+              aria-hidden="true"
+              className={`hero-focus absolute inset-0 ${idx === focused ? 'is-active' : ''}`}
+            >
+              <Img src={a.src} alt="" className="h-full w-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-navy/60 via-navy/5 to-transparent" />
+            </div>
+          ))}
 
           {/* Hover targets and labels, one cell per slice */}
           <div className="absolute inset-0 z-20 flex flex-col md:flex-row">
-            {amenities.map((a, idx) => {
-              const isActive = idx === active
-              return (
+            {amenities.map((a, idx) => (
+              <div
+                key={a.title}
+                tabIndex={0}
+                role="button"
+                aria-label={a.title}
+                onPointerEnter={(e) => e.pointerType === 'mouse' && show(idx)}
+                onPointerDown={(e) => { wasOpen.current = e.pointerType === 'touch' && active !== null }}
+                onClick={() => (wasOpen.current ? reset() : show(idx))}
+                onFocus={() => show(idx)}
+                onBlur={reset}
+                className="relative min-h-0 min-w-0 flex-1 cursor-pointer focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-sun"
+              >
+                {/* Collapsed title: plain horizontal text; a soft shadow keeps it readable over the photo */}
                 <div
-                  key={a.title}
-                  tabIndex={0}
-                  role="button"
-                  aria-label={a.title}
-                  onPointerEnter={(e) => e.pointerType === 'mouse' && show(idx)}
-                  onPointerDown={(e) => { wasOpen.current = e.pointerType === 'touch' && active !== null }}
-                  onClick={() => (wasOpen.current ? reset() : show(idx))}
-                  onFocus={() => show(idx)}
-                  onBlur={reset}
-                  className="relative min-h-0 min-w-0 flex-1 cursor-pointer focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-sun"
+                  className={`absolute left-4 top-1/2 max-w-[calc(100%-2rem)] -translate-y-1/2 text-white [text-shadow:0_1px_3px_rgb(0_0_0/0.7),0_0_12px_rgb(0_0_0/0.5)] transition-opacity duration-700 ease-in-out md:bottom-4 md:left-1/2 md:top-auto md:w-max md:max-w-[calc(100%-1rem)] md:-translate-x-1/2 md:translate-y-0 ${focused === null ? 'opacity-100' : 'opacity-0'
+                    }`}
                 >
-                  {/* Collapsed title: plain horizontal text; a soft shadow keeps it readable over the photo */}
-                  <div
-                    className={`absolute left-4 top-1/2 max-w-[calc(100%-2rem)] -translate-y-1/2 text-white [text-shadow:0_1px_3px_rgb(0_0_0/0.7),0_0_12px_rgb(0_0_0/0.5)] transition-opacity duration-300 md:bottom-4 md:left-1/2 md:top-auto md:w-max md:max-w-[calc(100%-1rem)] md:-translate-x-1/2 md:translate-y-0 ${active === null ? 'opacity-100' : 'opacity-0'
-                      }`}
-                  >
-                    <span className="text-lg font-semibold leading-tight md:block md:text-center md:text-sm">
-                      {a.title}
-                    </span>
-                  </div>
-
-                  {/* Expanded: title + extra info, shown over the full image */}
-                  <div
-                    className={`pointer-events-none absolute bottom-0 left-0 w-full p-4 transition-all duration-500 md:p-5 ${isActive ? 'translate-y-0 opacity-100' : 'translate-y-3 opacity-0'
-                      }`}
-                  >
-                    <h3 className="text-lg font-bold text-gold md:text-xl">{a.title}</h3>
-                    <p className="mt-1 text-sm text-white/90">{a.info}</p>
-                  </div>
+                  <span className="text-lg font-semibold leading-tight md:block md:text-center md:text-sm">
+                    {a.title}
+                  </span>
                 </div>
-              )
-            })}
+              </div>
+            ))}
           </div>
+
+          {/* Focused photo's title + info: full panel width, on a dark gradient so it reads over any photo */}
+          {amenities.map((a, idx) => (
+            <div
+              key={a.title}
+              className={`pointer-events-none absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-navy/90 via-navy/70 to-transparent p-4 pt-12 transition-[opacity,translate] duration-700 ease-in-out motion-reduce:transition-none md:p-5 md:pt-14 ${idx === focused ? 'translate-y-0 opacity-100' : 'translate-y-3 opacity-0'
+                }`}
+            >
+              <h3 className="text-lg font-bold text-gold md:text-xl">{a.title}</h3>
+              <p className="mt-1 text-sm text-white">{a.info}</p>
+            </div>
+          ))}
         </div>
 
       </div>
