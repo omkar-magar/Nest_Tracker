@@ -1,0 +1,114 @@
+# Render Blueprint: creates the database, the API and the website in one go. See docs/render-deploy.md.
+# Only KEYS are listed for secrets (sync: false); Render asks you for the values in its dashboard.
+# Plan names and the region are what I believe Render offers; if the dashboard shows others, change them here.
+# Keep every service in ONE region, otherwise the private database connection does not work.
+
+databases:
+  - name: yolo-nest-db
+    databaseName: yolo_nest
+    user: yolo_nest
+    plan: basic-256mb
+    region: singapore          # closest to Pune
+    postgresMajorVersion: "17" # same major version as the Supabase project (supabase/config.toml)
+    ipAllowList: []            # private network only. Add your IP here later for the data copy from Supabase.
+
+services:
+  # ---------------------------------------------------------------- API
+  - type: web
+    name: yolo-nest-api
+    runtime: node
+    region: singapore
+    plan: starter
+    branch: render-migration
+    buildCommand: npm ci
+    preDeployCommand: npm run db:migrate   # runs new SQL migrations before each release; a failure stops the deploy
+    startCommand: node server/index.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: yolo-nest-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      # exact address of the website below, e.g. https://yolo-nest-site.onrender.com (no trailing slash)
+      - key: APP_ORIGIN
+        sync: false
+      - key: APP_URL
+        sync: false
+      # Added by the stage that needs them (uncomment then, so the first deploy is not blocked on empty values):
+      # - key: RESEND_API_KEY
+      #   sync: false
+      # - key: MAIL_FROM
+      #   sync: false
+      # - key: MAIL_DRY_RUN
+      #   value: "false"
+      # - key: STORAGE_DRIVER
+      #   value: r2
+      # - key: R2_ACCOUNT_ID
+      #   sync: false
+      # - key: R2_ACCESS_KEY_ID
+      #   sync: false
+      # - key: R2_SECRET_ACCESS_KEY
+      #   sync: false
+      # - key: R2_DOCUMENTS_BUCKET
+      #   sync: false
+      # - key: R2_ROOM_IMAGES_BUCKET
+      #   sync: false
+      # - key: R2_PUBLIC_URL
+      #   sync: false
+      # - key: RAZORPAY_KEY_ID
+      #   sync: false
+      # - key: RAZORPAY_KEY_SECRET
+      #   sync: false
+      # - key: RAZORPAY_WEBHOOK_SECRET
+      #   sync: false
+
+  # ---------------------------------------------------------------- website
+  - type: web
+    name: yolo-nest-site
+    runtime: static
+    branch: render-migration
+    buildCommand: npm ci --include=dev && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_PAYMENT_PROVIDER
+        value: demo
+      # VITE_BACKEND (supabase | api) arrives with the frontend switch stage. Until then the site shows the
+      # static content from src/data/site.js, because no Supabase variables are set here.
+
+    # First match wins: /api goes to the API, everything else is the single-page app (was vercel.json "rewrites").
+    # If your API gets another address than yolo-nest-api.onrender.com, change it here.
+    routes:
+      - type: rewrite
+        source: /api/*
+        destination: https://yolo-nest-api.onrender.com/api/*
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+    # Same caching rules as vercel.json
+    headers:
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+      - path: /images/*
+        name: Cache-Control
+        value: public, max-age=86400, stale-while-revalidate=604800
+      - path: /icons/*
+        name: Cache-Control
+        value: public, max-age=86400, stale-while-revalidate=604800
+      - path: /sw.js
+        name: Cache-Control
+        value: no-cache
+      - path: /sw.js
+        name: Service-Worker-Allowed
+        value: /
+      - path: /*.webmanifest
+        name: Cache-Control
+        value: no-cache
+      - path: /.well-known/assetlinks.json
+        name: Content-Type
+        value: application/json

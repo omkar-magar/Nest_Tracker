@@ -4,7 +4,8 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  server: { port: 5174 },
+  // /api goes to the Express server (npm run server:dev), so the browser sees one origin, like on Render
+  server: { port: 5174, proxy: { '/api': 'http://localhost:3000' } },
   test: {
     environment: 'jsdom',
     setupFiles: ['./tests/setup.js'],
