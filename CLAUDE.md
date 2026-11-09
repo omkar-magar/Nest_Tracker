@@ -22,8 +22,9 @@ npm install
 npm run dev       # http://localhost:5174
 npm run build     # outputs dist/
 npm run preview
+npm test           # Vitest + Testing Library; all tests live in tests/
 ```
-No linter, formatter or tests are set up; don't add them unless asked. This machine has little free RAM: don't set a large `NODE_OPTIONS` heap.
+Tests are in `tests/` only (`*.test.js(x)`; mocks in `tests/helpers/`, Supabase and auth are mocked, no network or `.env` needed). Add a test there when you add or change behaviour. No linter or formatter is set up; don't add them unless asked. This machine has little free RAM: don't set a large `NODE_OPTIONS` heap.
 
 ## Conventions
 - Content changes go in `src/data/site.js`, not in components. Keep the comments there that tell the client where image files go.
@@ -35,6 +36,7 @@ No linter, formatter or tests are set up; don't add them unless asked. This mach
 - Every section needs an `id` matching the Navbar link and `scroll-mt-16` so it clears the sticky header.
 - Must work at 390px width, keep visible focus (`focus-visible`), meaningful `alt` text, and 4.5:1 text contrast.
 - Business logic lives in `src/services/` and in `supabase/migrations/` (RLS + RPCs); keep components thin. Payments go through `src/services/payments` only; see docs/payments.md.
+- Data loading: public data (catalogue, amenities, reviews) goes through `useQuery` / `src/lib/queryCache.js`; anything user-specific or admin goes through `useAsync` and is never cached across users. A function that changes beds, rooms or reviews must `invalidate('catalog')` / `invalidate('reviews')` (see `src/services/api.js`). Lists that grow (customers, bills, payments) are paged or capped in the query, not in the component. Signed-in pages are `lazy()` in `App.jsx`; a 360 viewer must be lazy too and import its own CSS.
 - Prices in `rooms` are demo values and `nearby` distances are `'x'` placeholders: don't invent real ones; ask the developer.
 
 ## Commits

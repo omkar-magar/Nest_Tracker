@@ -1,5 +1,6 @@
 @import "tailwindcss";
-@import "@photo-sphere-viewer/core/index.css";
+/* The 360 viewer stylesheet (@photo-sphere-viewer/core/index.css) is NOT imported here: import it inside the
+   lazy-loaded tour component, so visitors who never open a tour never download it. */
 
 /* Brand colours from the flyers. Change here and the whole site updates. */
 @theme {

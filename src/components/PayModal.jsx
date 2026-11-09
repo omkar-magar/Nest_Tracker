@@ -45,16 +45,26 @@ export default function PayModal({ bill, onClose, onFinished }) {
 
         {result ? (
           <div role="status" className="mt-4">
-            {result.status === 'succeeded'
-              ? <p className="font-semibold text-green-800">Payment recorded{result.is_simulated ? ' (simulated)' : ''}. Your bill is now paid.</p>
-              : <p className="font-semibold text-red-700">Payment failed{result.failure_reason ? `: ${result.failure_reason}` : ''}. Your bill is still unpaid.</p>}
+            {result.status === 'succeeded' ? (
+              <p className="font-semibold text-green-800">Payment recorded{result.is_simulated ? ' (simulated)' : ''}. Your bill is now paid.</p>
+            ) : result.status === 'created' ? (
+              <p className="font-semibold text-slate-700">No payment received yet. If money was deducted, your bill will update within a few minutes.</p>
+            ) : (
+              <p className="font-semibold text-red-700">Payment failed{result.failure_reason ? `: ${result.failure_reason}` : ''}. Your bill is still unpaid.</p>
+            )}
             <Button className="mt-4 w-full" onClick={onClose}>Close</Button>
           </div>
         ) : (
           <div className="mt-4 space-y-2">
             {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
-            <Button className="w-full" variant="primary" disabled={busy} onClick={() => pay('success')}>{busy ? 'Processing…' : 'Simulate successful payment'}</Button>
-            <Button className="w-full" variant="danger" disabled={busy} onClick={() => pay('failure')}>Simulate failed payment</Button>
+            {paymentProvider.isSimulated ? (
+              <>
+                <Button className="w-full" variant="primary" disabled={busy} onClick={() => pay('success')}>{busy ? 'Processing…' : 'Simulate successful payment'}</Button>
+                <Button className="w-full" variant="danger" disabled={busy} onClick={() => pay('failure')}>Simulate failed payment</Button>
+              </>
+            ) : (
+              <Button className="w-full" variant="primary" disabled={busy} onClick={() => pay()}>{busy ? 'Processing…' : `Pay ${rupees(bill.amount)}`}</Button>
+            )}
             <Button className="w-full" variant="outline" disabled={busy} onClick={onClose}>Cancel</Button>
           </div>
         )}
