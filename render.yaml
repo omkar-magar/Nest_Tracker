@@ -7,7 +7,7 @@ databases:
   - name: yolo-nest-db
     databaseName: yolo_nest
     user: yolo_nest
-    plan: basic-256mb
+    plan: free
     region: singapore          # closest to Pune
     postgresMajorVersion: "17" # same major version as the Supabase project (supabase/config.toml)
     ipAllowList: []            # private network only. Add your IP here later for the data copy from Supabase.
@@ -18,7 +18,7 @@ services:
     name: yolo-nest-api
     runtime: node
     region: singapore
-    plan: starter
+    plan: free
     branch: render-migration
     buildCommand: npm ci
     preDeployCommand: npm run db:migrate   # runs new SQL migrations before each release; a failure stops the deploy
