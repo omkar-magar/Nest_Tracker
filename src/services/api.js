@@ -88,9 +88,9 @@ export const CUSTOMERS_PAGE = 30
 export const adminCustomers = (page = 0) =>
   supabase.from('profiles').select(`
     id, full_name, phone, is_active, created_at,
-    bookings(id, status, check_in, check_out, rooms(room_no), booking_beds(active, beds(label))),
+    bookings!bookings_customer_id_fkey(id, status, check_in, check_out, rooms(room_no), booking_beds(active, beds(label))),
     bills(id, amount, status, due_date, description),
-    customer_documents(id, doc_type, file_name, file_path)
+    customer_documents!customer_documents_customer_id_fkey(id, doc_type, file_name, file_path)
   `).eq('role', 'customer').order('created_at', { ascending: false })
     .range(page * CUSTOMERS_PAGE, (page + 1) * CUSTOMERS_PAGE - 1).then(unwrap)
 
@@ -100,7 +100,7 @@ export const adminBills = () =>
     .eq('status', 'unpaid').order('due_date').then(unwrap)
 
 export const adminPayments = () =>
-  supabase.from('payments').select('*, profiles(full_name), bills(description)').order('created_at', { ascending: false }).limit(200).then(unwrap)
+  supabase.from('payments').select('*, profiles!payments_customer_id_fkey(full_name), bills(description)').order('created_at', { ascending: false }).limit(200).then(unwrap)
 
 export const adminEmployees = () =>
   supabase.from('profiles').select('id, full_name, phone, is_active, created_at, employee_permissions(*)')

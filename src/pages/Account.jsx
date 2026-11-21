@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import useAsync from '../hooks/useAsync'
 import PayModal from '../components/PayModal'
@@ -7,9 +7,13 @@ import { Badge, Button, Card, Empty, ErrorBox, Field, Notice, Spinner, Stat, Tab
 import { billLabel, daysOverdue, summarize } from '../services/billing'
 import { cancelBooking, deleteDocument, documentUrl, loadMyAccount, submitReview, updateMyProfile, uploadDocument } from '../services/api'
 import { formatDate, formatDateTime, rupees } from '../services/format'
+import NotificationBell from '../components/NotificationBell'
+import { GoogleReviewLink, MyAgreement, MyComplaints, NoticeToVacate, OfficeNotices, TenantDetails } from './account/TenantSections'
+import { invoicePdf, receiptPdf } from '../services/pdfDocs'
+import { owedOn } from '../services/billing'
 
 const DOC_TYPES = { id_proof: 'ID proof', address_proof: 'Address proof', photo: 'Photo', agreement: 'Agreement', other: 'Other' }
-const billTone = { Paid: 'green', Due: 'amber', Overdue: 'red', Void: 'gray' }
+const billTone = { Paid: 'green', Due: 'amber', 'Part paid': 'amber', Overdue: 'red', Void: 'gray' }
 
 function BookingCard({ booking, onChanged }) {
   const [busy, setBusy] = useState(false)
@@ -137,13 +141,30 @@ function ProfileForm({ profile, onSaved }) {
   )
 }
 
-const H2 = ({ children }) => <h2 className="mb-3 mt-10 text-xl font-bold">{children}</h2>
+const H2 = ({ children, id }) => <h2 id={id} className="mb-3 mt-10 scroll-mt-16 text-xl font-bold">{children}</h2>
 
 export default function Account() {
   const { user, profile, refreshProfile } = useAuth()
   const { state } = useLocation()
   const { data, error, loading, reload } = useAsync(() => loadMyAccount(user.id), [user.id])
   const [paying, setPaying] = useState(null)
+  const [params, setParams] = useSearchParams()
+
+  // links in reminders (?pay=<bill>) open the payment dialog; receipt links (?receipt=<payment>) download it
+  useEffect(() => {
+    if (!data) return
+    const pay = params.get('pay')
+    const rc = params.get('receipt')
+    if (pay) {
+      const b = data.bills.find((x) => x.id === pay && x.status === 'unpaid')
+      if (b) setPaying(b)
+      setParams({}, { replace: true })
+    } else if (rc) {
+      const p = data.payments.find((x) => x.id === rc && x.status === 'succeeded')
+      if (p) receiptPdf({ payment: p, bill: p.bills, tenant: profile }).catch(() => {})
+      setParams({}, { replace: true })
+    }
+  }, [data, params, setParams, profile])
 
   if (loading) return <Spinner label="Loading your dashboard" />
   if (error) return <div className="mx-auto max-w-3xl px-4 py-10"><ErrorBox error={error} onRetry={reload} /></div>
@@ -155,30 +176,34 @@ export default function Account() {
 
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-8 text-navy">
-      <h1 className="text-2xl font-bold">Hi {profile?.full_name || 'there'}</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold">Hi {profile?.full_name || 'there'}</h1>
+        <NotificationBell />
+      </div>
       {state?.justBooked && <div className="mt-4"><Notice tone="ok">Your beds are reserved. Pay the bills below to confirm your booking.</Notice></div>}
 
       <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="Amount paid" value={rupees(sum.amountPaid)} />
         <Stat label="Outstanding" value={rupees(sum.outstanding)} tone={sum.overdue.length ? 'red' : undefined} hint={sum.overdue.length ? `${sum.overdue.length} overdue` : undefined} />
-        <Stat label="Next bill" value={sum.nextBill ? rupees(sum.nextBill.amount) : '—'} />
+        <Stat label="Next bill" value={sum.nextBill ? rupees(owedOn(sum.nextBill)) : '—'} />
         <Stat label="Next due date" value={sum.nextBill ? formatDate(sum.nextBill.due_date) : '—'} tone={sum.overdue.length ? 'red' : undefined} />
       </div>
 
       <H2>Current booking</H2>
+      {live && <div className="mb-3"><NoticeToVacate booking={live} onChanged={reload} /></div>}
       {live ? <BookingCard booking={live} onChanged={reload} /> : <Empty title="No current booking">Find a room on the <Link className="underline" to="/rooms">Rooms page</Link>.</Empty>}
 
       <H2>Bills</H2>
-      {sum.nextBill && <div className="mb-3"><Button variant="sun" onClick={() => setPaying(sum.nextBill)}>Pay next bill · {rupees(sum.nextBill.amount)}</Button></div>}
+      {sum.nextBill && <div className="mb-3"><Button variant="sun" onClick={() => setPaying(sum.nextBill)}>Pay next bill · {rupees(owedOn(sum.nextBill))}</Button></div>}
       {data.bills.length === 0 ? <Empty title="No bills yet" /> : (
         <Table head={['Description', 'Amount', 'Due', 'Status', '']}>
           {data.bills.map((b) => (
             <tr key={b.id}>
               <td className="px-4 py-3">{b.description}</td>
-              <td className="px-4 py-3">{rupees(b.amount)}</td>
+              <td className="px-4 py-3">{rupees(b.amount)}{b.amount_paid > 0 && b.status === 'unpaid' && <span className="block text-xs text-slate-500">{rupees(owedOn(b))} left</span>}</td>
               <td className="px-4 py-3">{formatDate(b.due_date)}{daysOverdue(b) > 0 && <span className="block text-xs text-red-700">{daysOverdue(b)} days late</span>}</td>
               <td className="px-4 py-3"><Badge tone={billTone[billLabel(b)]}>{billLabel(b)}</Badge></td>
-              <td className="px-4 py-3 text-right">{b.status === 'unpaid' && <Button variant="outline" className="!py-1" onClick={() => setPaying(b)}>Pay</Button>}</td>
+              <td className="px-4 py-3 text-right"><span className="inline-flex gap-1">{b.status === 'unpaid' && <Button variant="outline" className="!py-1" onClick={() => setPaying(b)}>Pay</Button>}{b.invoice_no && <Button variant="outline" className="!py-1" onClick={() => invoicePdf({ bill: b, tenant: profile, room: live?.rooms?.room_no })}>PDF</Button>}</span></td>
             </tr>
           ))}
         </Table>
@@ -186,7 +211,7 @@ export default function Account() {
 
       <H2>Payment history</H2>
       {data.payments.length === 0 ? <Empty title="No payments yet" /> : (
-        <Table head={['Date', 'For', 'Amount', 'Method', 'Result']}>
+        <Table head={['Date', 'For', 'Amount', 'Method', 'Result', '']}>
           {data.payments.map((p) => (
             <tr key={p.id}>
               <td className="px-4 py-3">{formatDateTime(p.created_at)}</td>
@@ -194,12 +219,13 @@ export default function Account() {
               <td className="px-4 py-3">{rupees(p.amount)}</td>
               <td className="px-4 py-3">{p.is_simulated ? <Badge tone="amber">Demo (simulated)</Badge> : p.provider}</td>
               <td className="px-4 py-3"><Badge tone={p.status === 'succeeded' ? 'green' : p.status === 'failed' ? 'red' : 'gray'}>{p.status}</Badge></td>
+              <td className="px-4 py-3 text-right">{p.status === 'succeeded' && <Button variant="outline" className="!py-1" onClick={() => receiptPdf({ payment: p, bill: p.bills, tenant: profile })}>Receipt</Button>}</td>
             </tr>
           ))}
         </Table>
       )}
 
-      <H2>Documents</H2>
+      <H2 id="documents">Documents</H2>
       <Documents docs={data.documents} userId={user.id} bookingId={live?.id} onChanged={reload} />
 
       {past.length > 0 && (
@@ -217,11 +243,24 @@ export default function Account() {
         </>
       )}
 
+      <H2 id="complaints">Complaints</H2>
+      <MyComplaints hasStay={live?.status === 'active'} />
+
+      <H2 id="agreement">Rental agreement</H2>
+      <MyAgreement />
+
+      <H2>Notices</H2>
+      <OfficeNotices />
+
       <H2>Your details</H2>
       <Card><ProfileForm profile={profile} onSaved={refreshProfile} /></Card>
 
+      <H2>Emergency contacts and other details</H2>
+      <TenantDetails />
+
       <H2>Leave a review</H2>
       <ReviewBox existing={data.review} hasStay={hasStay} userId={user.id} name={profile?.full_name || 'Resident'} onChanged={reload} />
+      {hasStay && <GoogleReviewLink />}
 
       {paying && <PayModal bill={paying} onClose={() => setPaying(null)} onFinished={reload} />}
     </div>

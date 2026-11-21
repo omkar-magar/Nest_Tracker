@@ -3,12 +3,14 @@ import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { homeFor } from '../components/Navbar'
 import { Button, Card, Field, Notice, Spinner, inputCls } from '../components/ui'
+import { supabase } from '../lib/supabase'
+import useAsync from '../hooks/useAsync'
 
 // Roles allowed in each area. Admin may use the staff area too; the database still decides what they can read.
 const AUDIENCE = {
   customer: { title: 'Log in', roles: ['customer'], after: '/account' },
-  employee: { title: 'Staff log in', roles: ['employee', 'admin'], after: '/staff' },
-  admin: { title: 'Admin log in', roles: ['admin'], after: '/admin' },
+  employee: { title: 'Staff log in', roles: ['employee', 'admin', 'manager'], after: '/staff' },
+  admin: { title: 'Admin log in', roles: ['admin', 'manager', 'sales'], after: '/admin' },
 }
 
 export default function Login({ audience = 'customer' }) {
@@ -23,6 +25,12 @@ export default function Login({ audience = 'customer' }) {
 
   const next = params.get('next')
   const allowed = cfg.roles.includes(role)
+  const [otp, setOtp] = useState(false)
+  // ?property=P1 shows that property's name and address: a branded login link per property (PRD 2.1)
+  const propertyId = params.get('property')
+  const branded = useAsync(() => (propertyId && configured
+    ? supabase.from('properties').select('name, address').eq('id', propertyId).maybeSingle().then((r) => r.data)
+    : Promise.resolve(null)), [propertyId, configured])
 
   // Already signed in with the right role (for example the PWA reopening): go straight in.
   useEffect(() => {
@@ -49,6 +57,7 @@ export default function Login({ audience = 'customer' }) {
   return (
     <div className="mx-auto w-full max-w-md px-4 py-12 text-navy">
       <h1 className="text-2xl font-bold">{cfg.title}</h1>
+      {branded.data && <p className="mt-1 text-sm text-slate-600">{branded.data.name} · {branded.data.address}</p>}
       {wrongRole ? (
         <Card className="mt-6">
           <p className="text-sm">You are signed in as a <strong>{role}</strong>, which cannot open this area.</p>
@@ -57,7 +66,7 @@ export default function Login({ audience = 'customer' }) {
             <Button variant="outline" onClick={signOut}>Log out</Button>
           </div>
         </Card>
-      ) : (
+      ) : otp ? <OtpLogin onBack={() => setOtp(false)} /> : (
         <form onSubmit={submit} className="mt-6 space-y-4 rounded-2xl border border-navy/10 bg-white p-5">
           <Field label="Email">
             <input className={inputCls} type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -67,11 +76,52 @@ export default function Login({ audience = 'customer' }) {
           </Field>
           {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
           <Button type="submit" variant="primary" className="w-full" disabled={busy}>{busy ? 'Signing in…' : 'Log in'}</Button>
+          <div className="flex flex-wrap justify-between gap-2 text-sm">
+            <button type="button" className="font-medium underline" onClick={() => setOtp(true)}>Use mobile number (OTP) instead</button>
+            <Link className="font-medium underline" to="/forgot-password">Forgot password?</Link>
+          </div>
           {audience === 'customer' && (
             <p className="text-center text-sm text-slate-600">New here? <Link className="font-medium underline" to="/signup">Create an account</Link></p>
           )}
         </form>
       )}
     </div>
+  )
+}
+
+const e164 = (phone) => {
+  const d = phone.replace(/\D/g, '')
+  return `+${d.length === 10 ? `91${d}` : d}`
+}
+
+// PRD 2.1 login with mobile number + one-time code. Needs an SMS provider switched on in Supabase Auth (Phone).
+function OtpLogin({ onBack }) {
+  const [phone, setPhone] = useState('')
+  const [code, setCode] = useState('')
+  const [sent, setSent] = useState(false)
+  const [state, setState] = useState({ busy: false, error: '' })
+  const send = async (e) => {
+    e.preventDefault()
+    setState({ busy: true, error: '' })
+    const { error } = sent
+      ? await supabase.auth.verifyOtp({ phone: e164(phone), token: code.trim(), type: 'sms' })
+      : await supabase.auth.signInWithOtp({ phone: e164(phone), options: { shouldCreateUser: false } })
+    setState({ busy: false, error: error?.message ?? '' })
+    if (!error && !sent) setSent(true)
+  }
+  return (
+    <form onSubmit={send} className="mt-6 space-y-4 rounded-2xl border border-navy/10 bg-white p-5">
+      <Field label="Mobile number">
+        <input className={inputCls} inputMode="tel" autoComplete="tel" required disabled={sent} value={phone} onChange={(e) => setPhone(e.target.value)} />
+      </Field>
+      {sent && (
+        <Field label="6-digit code sent by SMS">
+          <input className={inputCls} inputMode="numeric" autoComplete="one-time-code" required pattern="[0-9]{6}" value={code} onChange={(e) => setCode(e.target.value)} />
+        </Field>
+      )}
+      {state.error && <p role="alert" className="text-sm text-red-700">{state.error}</p>}
+      <Button type="submit" className="w-full" disabled={state.busy}>{state.busy ? 'Please wait…' : sent ? 'Verify and log in' : 'Send code'}</Button>
+      <button type="button" className="text-sm font-medium underline" onClick={onBack}>Use email and password</button>
+    </form>
   )
 }

@@ -44,7 +44,7 @@ export async function loadCatalog() {
   const [cats, rms, beds] = await Promise.all([
     supabase.from('categories').select('id, name, tag').order('sort_order'),
     supabase.from('rooms').select(ROOM_COLS).eq('is_active', true).order('room_no'),
-    supabase.from('beds').select('id, room_id, label, status, is_occupied').order('label'),
+    supabase.from('beds').select('id, room_id, label, status, is_occupied, is_reserved, is_active').order('label'),
   ])
   const failed = [cats, rms, beds].find((r) => r.error)
   if (failed) throw failed.error
@@ -93,9 +93,11 @@ export async function loadPublishedReviews() {
 // 'unknown' when there is no backend; otherwise how full the room is
 export function availability(room) {
   if (!room.beds) return { status: 'unknown', free: null, total: room.totalBeds }
-  const free = room.beds.filter((b) => !b.is_occupied && b.status === 'available').length
-  const taken = room.beds.filter((b) => b.is_occupied).length
-  const total = room.beds.length
+  // reserved beds (held for someone at the office) and switched-off beds are not free
+  const beds = room.beds.filter((b) => b.is_active !== false)
+  const free = beds.filter((b) => !b.is_occupied && !b.is_reserved && b.status === 'available').length
+  const taken = beds.filter((b) => b.is_occupied || b.is_reserved).length
+  const total = beds.length
   // whole-room rentals are only bookable when every bed is free
   const bookable = room.rentBasis === 'room' ? free === total && total > 0 : free > 0
   let status

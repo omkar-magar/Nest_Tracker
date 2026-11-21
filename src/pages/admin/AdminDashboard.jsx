@@ -381,11 +381,11 @@ const TABS = [
   ['reviews', 'Reviews', Reviews], ['activity', 'Activity', Activity],
 ]
 
-export default function AdminDashboard() {
+export default function AdminDashboard({ embedded = false }) {
   const [tab, setTab] = useState('overview')
   const Current = TABS.find(([k]) => k === tab)[2]
   return (
-    <Shell title="Admin dashboard" tabs={TABS.map(([k, l]) => [k, l])} tab={tab} onTab={setTab}>
+    <Shell embedded={embedded} title="Admin dashboard" tabs={TABS.map(([k, l]) => [k, l])} tab={tab} onTab={setTab}>
       <Current key={tab} />
     </Shell>
   )

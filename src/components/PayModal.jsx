@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Button } from './ui'
+import { Button, inputCls } from './ui'
 import { payBill, paymentProvider } from '../services/payments'
 import { rupees } from '../services/format'
 
@@ -9,6 +9,11 @@ export default function PayModal({ bill, onClose, onFinished }) {
   const [result, setResult] = useState(null)
   const [error, setError] = useState('')
   const ref = useRef(null)
+  const owed = bill.amount - (bill.amount_paid || 0)
+  const [amount, setAmount] = useState(String(owed))
+  // less than what is owed = a part payment; the backend refuses more than what is owed
+  const part = Number(amount) >= 1 && Number(amount) < owed ? Math.floor(Number(amount)) : undefined
+  const bad = !(Number(amount) >= 1 && Number(amount) <= owed)
 
   useEffect(() => {
     ref.current?.focus()
@@ -21,7 +26,8 @@ export default function PayModal({ bill, onClose, onFinished }) {
     setBusy(true)
     setError('')
     try {
-      const payment = await payBill(bill, { chooseOutcome: async () => outcome })
+      const ui = { chooseOutcome: async () => outcome }
+      const payment = await (part ? payBill(bill, ui, part) : payBill(bill, ui))
       setResult(payment)
       onFinished()
     } catch (e) {
@@ -34,7 +40,7 @@ export default function PayModal({ bill, onClose, onFinished }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-navy/50 p-4 sm:items-center" role="presentation">
       <div role="dialog" aria-modal="true" aria-labelledby="pay-title" ref={ref} tabIndex={-1} className="w-full max-w-md rounded-2xl bg-white p-6 text-navy outline-none">
-        <h2 id="pay-title" className="text-lg font-bold">Pay {rupees(bill.amount)}</h2>
+        <h2 id="pay-title" className="text-lg font-bold">Pay {rupees(owed)}</h2>
         <p className="text-sm text-slate-600">{bill.description}</p>
 
         {paymentProvider.isSimulated && (
@@ -46,7 +52,7 @@ export default function PayModal({ bill, onClose, onFinished }) {
         {result ? (
           <div role="status" className="mt-4">
             {result.status === 'succeeded' ? (
-              <p className="font-semibold text-green-800">Payment recorded{result.is_simulated ? ' (simulated)' : ''}. Your bill is now paid.</p>
+              <p className="font-semibold text-green-800">Payment recorded{result.is_simulated ? ' (simulated)' : ''}. {part ? 'The rest of this bill is still due.' : 'Your bill is now paid.'}</p>
             ) : result.status === 'created' ? (
               <p className="font-semibold text-slate-700">No payment received yet. If money was deducted, your bill will update within a few minutes.</p>
             ) : (
@@ -56,14 +62,17 @@ export default function PayModal({ bill, onClose, onFinished }) {
           </div>
         ) : (
           <div className="mt-4 space-y-2">
+            <label className="block text-sm font-medium">Amount to pay now (you can pay part of it)
+              <input type="number" min="1" max={owed} className={`${inputCls} mt-1`} value={amount} onChange={(e) => setAmount(e.target.value)} />
+            </label>
             {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
             {paymentProvider.isSimulated ? (
               <>
-                <Button className="w-full" variant="primary" disabled={busy} onClick={() => pay('success')}>{busy ? 'Processing…' : 'Simulate successful payment'}</Button>
+                <Button className="w-full" variant="primary" disabled={busy || bad} onClick={() => pay('success')}>{busy ? 'Processing…' : 'Simulate successful payment'}</Button>
                 <Button className="w-full" variant="danger" disabled={busy} onClick={() => pay('failure')}>Simulate failed payment</Button>
               </>
             ) : (
-              <Button className="w-full" variant="primary" disabled={busy} onClick={() => pay()}>{busy ? 'Processing…' : `Pay ${rupees(bill.amount)}`}</Button>
+              <Button className="w-full" variant="primary" disabled={busy || bad} onClick={() => pay()}>{busy ? 'Processing…' : `Pay ${rupees(part ?? owed)}`}</Button>
             )}
             <Button className="w-full" variant="outline" disabled={busy} onClick={onClose}>Cancel</Button>
           </div>

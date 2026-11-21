@@ -9,6 +9,9 @@ export function daysOverdue(bill) {
   return Math.round((new Date(today()) - new Date(bill.due_date)) / 86400000)
 }
 
+// what is still owed on a bill (part payments reduce it)
+export const owedOn = (b) => (b.status === 'unpaid' ? b.amount - (b.amount_paid || 0) : 0)
+
 export function summarize(bills, payments) {
   const unpaid = bills.filter((b) => b.status === 'unpaid').sort((a, b) => a.due_date.localeCompare(b.due_date))
   const paid = payments.filter((p) => p.status === 'succeeded')
@@ -16,10 +19,10 @@ export function summarize(bills, payments) {
     unpaid,
     nextBill: unpaid[0] ?? null,
     amountPaid: paid.reduce((s, p) => s + p.amount, 0),
-    outstanding: unpaid.reduce((s, b) => s + b.amount, 0),
+    outstanding: unpaid.reduce((s, b) => s + owedOn(b), 0),
     overdue: unpaid.filter(isOverdue),
-    overdueAmount: unpaid.filter(isOverdue).reduce((s, b) => s + b.amount, 0),
+    overdueAmount: unpaid.filter(isOverdue).reduce((s, b) => s + owedOn(b), 0),
   }
 }
 
-export const billLabel = (bill) => (isOverdue(bill) ? 'Overdue' : bill.status === 'unpaid' ? 'Due' : bill.status === 'paid' ? 'Paid' : 'Void')
+export const billLabel = (bill) => (isOverdue(bill) ? 'Overdue' : bill.status === 'unpaid' ? (bill.amount_paid > 0 ? 'Part paid' : 'Due') : bill.status === 'paid' ? 'Paid' : 'Void')

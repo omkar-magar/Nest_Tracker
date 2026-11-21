@@ -19,8 +19,9 @@ async function getPaymentStatus(paymentId) {
   return data
 }
 
-export async function payBill(bill, ui) {
-  const order = await paymentProvider.createOrder(bill)
+// amount: a part payment (less than what is owed); leave it out to pay in full
+export async function payBill(bill, ui, amount) {
+  const order = await paymentProvider.createOrder(bill, amount)
   await paymentProvider.collect(order, ui)
   return getPaymentStatus(order.paymentId)
 }

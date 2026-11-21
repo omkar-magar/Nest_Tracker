@@ -1,0 +1,91 @@
+// Pure helpers shared by the PG-management screens. No data access here.
+
+export const BED_STATES = {
+  vacant: { label: 'Vacant', cls: 'bg-green-100 text-green-900 border-green-300' },
+  occupied: { label: 'Occupied', cls: 'bg-navy text-white border-navy' },
+  reserved: { label: 'Reserved', cls: 'bg-sun/40 text-navy border-gold' },
+  maintenance: { label: 'Maintenance / blocked', cls: 'bg-red-100 text-red-800 border-red-300' },
+  inactive: { label: 'Inactive', cls: 'bg-slate-100 text-slate-500 border-slate-300 line-through' },
+}
+
+// Same order of checks as public.bed_state() in the database
+export function bedState(b) {
+  if (b.is_active === false) return 'inactive'
+  if (b.is_occupied) return 'occupied'
+  if (b.is_reserved) return 'reserved'
+  if (b.status && b.status !== 'available') return 'maintenance'
+  return 'vacant'
+}
+
+// Invoice label, same rules as public.bill_state()
+export function invoiceState(b, today = new Date().toISOString().slice(0, 10)) {
+  if (b.status === 'void') return 'void'
+  if (b.status === 'paid') return 'paid'
+  if (b.due_date < today) return 'overdue'
+  if ((b.amount_paid || 0) > 0) return 'partially_paid'
+  return 'pending'
+}
+export const INVOICE_TONES = { pending: 'amber', partially_paid: 'amber', overdue: 'red', paid: 'green', void: 'gray' }
+export const owed = (b) => (b.status === 'unpaid' ? b.amount - (b.amount_paid || 0) : 0)
+
+export function ageingBucket(daysLate) {
+  if (daysLate <= 7) return '0-7'
+  if (daysLate <= 15) return '8-15'
+  if (daysLate <= 30) return '16-30'
+  return '30+'
+}
+
+export const label = (s) => (s ? String(s).replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase()) : '')
+
+// Only the last four characters of an ID number are ever kept or shown.
+export const maskId = (last4) => (last4 ? `XXXX-XXXX-${last4}` : '')
+export const lastFour = (idNumber) => String(idNumber || '').replace(/[^0-9A-Za-z]/g, '').slice(-4)
+
+export const ENQUIRY_STATUSES = ['new', 'contacted', 'interested', 'visit_scheduled', 'visited', 'negotiation', 'booked', 'lost']
+export const LOST_REASONS = ['price', 'location', 'food', 'found_elsewhere', 'not_reachable', 'facilities', 'other']
+export const LEAD_SOURCES = ['website', 'app', 'google_ads', 'google_business', 'facebook', 'instagram', 'whatsapp', 'call', 'walk_in',
+  'justdial', 'broker', 'referral', 'hoarding', 'pamphlet', 'college_tieup', 'corporate_tieup', 'other']
+export const COMPLAINT_CATEGORIES = ['electrical', 'plumbing', 'wifi', 'housekeeping', 'food', 'ac_appliances', 'furniture', 'security', 'noise', 'other']
+export const COMPLAINT_LABELS = { wifi: 'Wi-Fi / Internet', ac_appliances: 'AC / Appliances', food: 'Food / Mess', noise: 'Noise / Neighbour' }
+export const complaintCategory = (c) => COMPLAINT_LABELS[c] ?? label(c)
+export const PRIORITIES = ['low', 'medium', 'high', 'urgent']
+export const CHARGE_KINDS = ['electricity', 'ac', 'laundry', 'food', 'parking', 'maintenance', 'wifi', 'fine', 'damage', 'other']
+export const ID_TYPES = ['aadhaar', 'driving_licence', 'passport', 'voter_id', 'college_id', 'company_id', 'pan', 'other']
+export const PAY_MODES = ['cash', 'upi', 'bank_transfer', 'cheque']
+
+// Next allowed complaint moves (the database enforces the same flow)
+export function complaintMoves(status, { manage, staff, tenant }) {
+  const m = []
+  if (manage && ['new', 'in_progress'].includes(status)) m.push('assigned')
+  if ((manage || staff) && ['new', 'assigned'].includes(status)) m.push('in_progress')
+  if ((manage || staff) && ['new', 'assigned', 'in_progress'].includes(status)) m.push('resolved')
+  if ((manage && status !== 'closed') || (tenant && status === 'resolved')) m.push('closed')
+  if (['resolved', 'closed'].includes(status)) m.push('reopen')
+  return m
+}
+
+// Lead temperature rule used for the preview (the database sets the stored value the same way)
+export function leadTemperature(moveIn, today = new Date(), hot = 7, warm = 30) {
+  if (!moveIn) return 'warm'
+  const days = Math.round((new Date(`${moveIn}T00:00`) - new Date(today.toDateString())) / 864e5)
+  if (days <= hot) return 'hot'
+  if (days <= warm) return 'warm'
+  return 'cold'
+}
+
+export const ymd = (d = new Date()) => {
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+export const monthStart = (d = new Date()) => ymd(new Date(d.getFullYear(), d.getMonth(), 1))
+export const addDays = (s, n) => { const d = new Date(`${s}T00:00`); d.setDate(d.getDate() + n); return ymd(d) }
+
+// WhatsApp-ready vacancy message built from live bed data (PRD 9.4)
+export function vacancyMessage(rooms, { brandName, phone, url }) {
+  const lines = rooms
+    .map((r) => ({ r, free: (r.beds || []).filter((b) => bedState(b) === 'vacant').length }))
+    .filter((x) => x.free > 0)
+    .map(({ r, free }) => `• Room ${r.room_no} (${r.ac_type}, ${label(r.room_type)}): ${free} bed${free > 1 ? 's' : ''} free · ₹${Number(r.price).toLocaleString('en-IN')}/${r.billing_period === 'night' ? 'night' : 'month'}`)
+  if (!lines.length) return `${brandName}: we are full right now. Call ${phone} to join the waiting list.`
+  return [`🏠 ${brandName} - beds available now`, ...lines, '', `Book a visit: ${url}`, `Call / WhatsApp: ${phone}`].join('\n')
+}

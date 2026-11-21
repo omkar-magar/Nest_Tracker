@@ -34,8 +34,9 @@ export const razorpayProvider = {
   label: 'Razorpay',
   isSimulated: false,
 
-  async createOrder(bill) {
-    const o = await invoke('razorpay-create-order', { billId: bill.id })
+  // amount: only for a part payment; the server checks it against what is owed
+  async createOrder(bill, amount) {
+    const o = await invoke('razorpay-create-order', amount ? { billId: bill.id, amount } : { billId: bill.id })
     return { ...o, description: bill.description }
   },
 

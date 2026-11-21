@@ -8,10 +8,13 @@ export const demoProvider = {
   isSimulated: true,
 
   // Asks the backend for a payment row in status "created". Nothing is paid yet.
-  async createOrder(bill) {
-    const { data, error } = await supabase.rpc('payment_create_order', { p_bill_id: bill.id, p_provider: 'demo' })
+  // amount: only for a part payment; without it the backend charges everything still owed.
+  async createOrder(bill, amount) {
+    const args = { p_bill_id: bill.id, p_provider: 'demo' }
+    if (amount) args.p_amount = amount
+    const { data, error } = await supabase.rpc('payment_create_order', args)
     if (error) throw error
-    return { paymentId: data, amount: bill.amount }
+    return { paymentId: data, amount: amount || bill.amount - (bill.amount_paid || 0) }
   },
 
   // The "gateway" step. For the demo, the user picks the outcome; the backend records it.

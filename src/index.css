@@ -9,6 +9,10 @@
   --color-sun: #f2c230;       /* bright yellow: hero button, highlight, map accents */
   --color-gold-deep: #8a6a00; /* dark gold text on light backgrounds */
   --color-cream: #fbfaf6;     /* light page background */
+  /* Chart series, in this fixed order (validated for colour-blind separation and 3:1 contrast on cream) */
+  --color-chart-1: #4a63c9;
+  --color-chart-2: #c47f17;
+  --color-chart-3: #2f9e6e;
   --font-sans: "Poppins", sans-serif;
 }
 
