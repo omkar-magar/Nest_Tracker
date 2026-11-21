@@ -20,10 +20,10 @@ beforeAll(async () => {
   otherManager = await makeUser(db, 'manager', 'Other')
   tenant = await makeUser(db, 'customer', 'Ravi')
   tenant2 = await makeUser(db, 'customer', 'Neha')
-  await db.query("insert into public.properties (id, name) values ('P2', 'Second PG')")
+  await db.query("insert into public.properties (id, name) values ('P3', 'Second PG')")
   await as(db, owner, async ({ q }) => {
     await q("select public.admin_assign_member('P1', $1, true)", [manager])
-    await q("select public.admin_assign_member('P2', $1, true)", [otherManager])
+    await q("select public.admin_assign_member('P3', $1, true)", [otherManager])
   })
   for (const t of [tenant, tenant2]) {
     await as(db, t, ({ q }) => q('select public.save_my_tenant_profile($1)', [emergency]))
@@ -46,17 +46,19 @@ describe('property and beds', () => {
   })
 
   it('lets both wings use the same room numbers, with distinct bed codes', async () => {
-    await as(db, manager, ({ q }) =>
-      q("select public.bulk_create_rooms('P1', 6, 601, 1, 2, 'monthly-pg', 'double', 'AC', 7000, 0, 'month', 'B')"))
-    const room = await db.query("select wing, room_no from public.rooms where id = 'p1-b-601'")
-    expect(room.rows[0]).toEqual({ wing: 'B', room_no: '601' })
-    expect((await bedsOf('p1-b-601')).map((b) => b.code)).toEqual(['P1-B-F6-R601-B1', 'P1-B-F6-R601-B2'])
-    await expect(as(db, manager, ({ q }) =>
-      q("select public.bulk_create_rooms('P1', 6, 601, 1, 1, 'monthly-pg', 'single', 'AC', 7000, 0, 'month', 'B')"))).rejects.toThrow(/already exists/)
-    // moving a room to the other wing rebuilds its bed codes
-    await db.query("update public.rooms set wing = 'B' where id = 'pg-102'")
-    expect((await bedsOf('pg-102'))[0].code).toBe('P1-B-F1-R102-B1')
-    await db.query("update public.rooms set wing = 'A' where id = 'pg-102'")
+    // B wing is property P2; the wing argument can't override the property's wing
+    await as(db, owner, ({ q }) =>
+      q("select public.bulk_create_rooms('P2', 6, 601, 1, 2, 'monthly-pg', 'double', 'AC', 7000, 0, 'month', 'A')"))
+    const room = await db.query("select property_id, wing, room_no from public.rooms where id = 'p2-b-601'")
+    expect(room.rows[0]).toEqual({ property_id: 'P2', wing: 'B', room_no: '601' })
+    expect((await bedsOf('p2-b-601')).map((b) => b.code)).toEqual(['P2-B-F6-R601-B1', 'P2-B-F6-R601-B2'])
+    await expect(as(db, owner, ({ q }) =>
+      q("select public.bulk_create_rooms('P2', 6, 601, 1, 1, 'monthly-pg', 'single', 'AC', 7000)"))).rejects.toThrow(/already exists/)
+    // moving a room to the other wing's property rebuilds its bed codes
+    await db.query("update public.rooms set property_id = 'P2' where id = 'pg-102'")
+    expect((await bedsOf('pg-102'))[0].code).toBe('P2-B-F1-R102-B1')
+    await db.query("update public.rooms set property_id = 'P1' where id = 'pg-102'")
+    expect((await bedsOf('pg-102'))[0].code).toBe('P1-A-F1-R102-B1')
   })
 
   it('reserves a bed, blocks others, and shows it as reserved', async () => {

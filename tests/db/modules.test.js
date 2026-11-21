@@ -17,11 +17,11 @@ beforeAll(async () => {
   sales2 = await makeUser(db, 'sales', 'Tara')
   staffUser = await makeUser(db, 'employee', 'Raju')
   tenant = await makeUser(db, 'customer', 'Ravi')
-  await db.query("insert into public.properties (id, name, lat, lng) values ('P2', 'Second PG', 18.59, 73.74)")
+  await db.query("insert into public.properties (id, name, lat, lng) values ('P3', 'Second PG', 18.59, 73.74)")
   await db.query('update public.properties set lat = 18.5912, lng = 73.7389 where id = $1', ['P1'])
   await as(db, owner, async ({ q }) => {
     for (const u of [manager, sales1, sales2, staffUser]) await q("select public.admin_assign_member('P1', $1, true)", [u])
-    await q("select public.admin_assign_member('P2', $1, true)", [otherManager])
+    await q("select public.admin_assign_member('P3', $1, true)", [otherManager])
   })
   await as(db, tenant, ({ q }) => q('select public.save_my_tenant_profile($1)', [emergency]))
   const bed = await one("select id from public.beds where room_id = 'pg-101' order by label limit 1")
@@ -253,7 +253,7 @@ describe('reports, dashboard and jobs (PRD 7)', () => {
     const d = await as(db, owner, ({ one: o }) => o('select public.owner_dashboard() d'))
     expect(d.d.beds.occupied).toBe(2)
     expect(Number(d.d.beds.occupancy_pct)).toBeGreaterThan(0)
-    expect(d.d.properties.map((p) => p.id)).toEqual(['P1', 'P2'])
+    expect(d.d.properties.map((p) => p.id)).toEqual(['P1', 'P2', 'P3'])
     const m = await as(db, manager, ({ one: o }) => o('select public.owner_dashboard() d'))
     expect(m.d.properties.map((p) => p.id)).toEqual(['P1'])
     await expect(as(db, tenant, ({ q }) => q('select public.owner_dashboard()'))).rejects.toThrow(/owner and managers/)
@@ -295,7 +295,7 @@ describe('reports, dashboard and jobs (PRD 7)', () => {
   })
 
   it('runs the scheduled jobs, throttles repeats, and releases expired reservations', async () => {
-    const bed = await one("select id from public.beds where room_id = 'stay-501' order by label limit 1")
+    const bed = await one("select id from public.beds where room_id = 'dpg-201' order by label limit 1")
     const r = await as(db, manager, ({ one: o }) => o("select public.reserve_bed($1, 'Ghost', null, 500, current_date) id", [bed.id]))
     await db.query('update public.reservations set expires_on = current_date - 1 where id = $1', [r.id])
     const res = await as(db, owner, ({ one: o }) => o('select public.run_scheduled_jobs(true) r'))

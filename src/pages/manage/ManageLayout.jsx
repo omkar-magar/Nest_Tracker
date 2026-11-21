@@ -5,7 +5,7 @@ import useAsync from '../../hooks/useAsync'
 import NotificationBell from '../../components/NotificationBell'
 import { ScopeProvider, useScope } from '../../components/manage/kit'
 import { Button, ErrorBox, Spinner, inputCls } from '../../components/ui'
-import { loadProperties, runJobs } from '../../services/manage'
+import { loadProperties, loadStartProperty, runJobs } from '../../services/manage'
 
 // Modules of the management console and the roles that see them. The database enforces the same split.
 export const MODULES = [
@@ -33,16 +33,16 @@ function PropertySwitch() {
     <label className="text-sm">
       <span className="sr-only">Property</span>
       <select className={`${inputCls} !w-auto !py-1.5`} value={property} onChange={(e) => setProperty(e.target.value)}>
-        <option value="">All properties</option>
-        {properties.map((p) => <option key={p.id} value={p.id}>{p.id} · {p.name}</option>)}
+        <option value="">All wings · grand total</option>
+        {properties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
       </select>
     </label>
   )
 }
 
 export default function ManageLayout() {
-  const { role, profile, signOut } = useAuth()
-  const props = useAsync(loadProperties, [])
+  const { role, profile, user, signOut } = useAuth()
+  const props = useAsync(() => Promise.all([loadProperties(), loadStartProperty(user?.id)]), [user?.id])
 
   // Timed rules (invoices, reminders, late fees, escalations...) also run from the scheduler; opening the console
   // gives them a nudge. The database skips the run if it happened in the last 30 minutes.
@@ -50,7 +50,7 @@ export default function ManageLayout() {
 
   const nav = MODULES.filter(([, , roles]) => roles.includes(role))
   return (
-    <ScopeProvider properties={props.data ?? []}>
+    <ScopeProvider properties={props.data?.[0] ?? []} initial={props.data?.[1] ?? ''}>
       <div className="mx-auto w-full max-w-7xl px-4 py-5 text-navy">
         <header className="flex flex-wrap items-center justify-between gap-3">
           <div>

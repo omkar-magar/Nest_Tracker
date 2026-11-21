@@ -10,14 +10,15 @@ insert into public.categories (id, name, tag, sort_order) values
   ('airbnb',     'Airbnb-style Stay', 'From ₹2,500 / night',            5)
 on conflict (id) do nothing;
 
-insert into public.rooms (id, category_id, wing, room_no, floor, ac_type, description, features, image_url,
+-- A wing rooms are in property P1, B wing rooms in P2
+insert into public.rooms (id, property_id, category_id, wing, room_no, floor, ac_type, description, features, image_url,
                           rent_basis, billing_period, price, deposit) values
-  ('pg-101',   'monthly-pg', 'A', '101', 1, 'AC',     'Shared AC room in the PG block.',           '{AC,Furnished}',     '/images/rooms/pg-101.webp',   'bed',  'month', 7500,  7500),
-  ('pg-102',   'monthly-pg', 'A', '102', 1, 'Non-AC', 'Shared non-AC room in the PG block.',       '{Furnished}',        '/images/rooms/pg-102.webp',   'bed',  'month', 6500,  6500),
-  ('dpg-201',  'daily-pg', 'A',   '201', 2, 'AC',     'Shared AC room for short stays.',           '{AC,Furnished}',     '/images/rooms/dpg-201.webp',  'bed',  'night',  800,     0),
-  ('flat-301', 'flat-1bhk', 'B',  '301', 3, 'AC',     'Self-contained 1BHK flat.',                 '{AC,Furnished}',     '/images/rooms/flat-301.webp', 'room', 'month', 18000, 18000),
-  ('lodge-401','lodge', 'B',      '401', 4, 'AC',     'Private lodge room.',                       '{AC}',               '/images/rooms/lodge-401.webp','room', 'night', 1500,     0),
-  ('stay-501', 'airbnb', 'B',     '501', 5, 'AC',     'Airbnb-style stay for a group.',            '{AC,Furnished}',     '/images/rooms/stay-501.webp', 'room', 'night', 3200,     0)
+  ('pg-101',   'P1', 'monthly-pg', 'A', '101', 1, 'AC',     'Shared AC room in the PG block.',           '{AC,Furnished}',     '/images/rooms/pg-101.webp',   'bed',  'month', 7500,  7500),
+  ('pg-102',   'P1', 'monthly-pg', 'A', '102', 1, 'Non-AC', 'Shared non-AC room in the PG block.',       '{Furnished}',        '/images/rooms/pg-102.webp',   'bed',  'month', 6500,  6500),
+  ('dpg-201',  'P1', 'daily-pg', 'A',   '201', 2, 'AC',     'Shared AC room for short stays.',           '{AC,Furnished}',     '/images/rooms/dpg-201.webp',  'bed',  'night',  800,     0),
+  ('flat-301', 'P2', 'flat-1bhk', 'B',  '301', 3, 'AC',     'Self-contained 1BHK flat.',                 '{AC,Furnished}',     '/images/rooms/flat-301.webp', 'room', 'month', 18000, 18000),
+  ('lodge-401','P2', 'lodge', 'B',      '401', 4, 'AC',     'Private lodge room.',                       '{AC}',               '/images/rooms/lodge-401.webp','room', 'night', 1500,     0),
+  ('stay-501', 'P2', 'airbnb', 'B',     '501', 5, 'AC',     'Airbnb-style stay for a group.',            '{AC,Furnished}',     '/images/rooms/stay-501.webp', 'room', 'night', 3200,     0)
 on conflict (id) do nothing;
 
 insert into public.beds (room_id, label)

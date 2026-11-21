@@ -52,13 +52,25 @@ function Users() {
                 })}
               </span>
             )) },
+            { key: 'opens', label: 'Opens on', value: (u) => members.find((x) => x.user_id === u.id && x.is_default)?.property_id ?? '', render: (u) => {
+              const mine = members.filter((x) => x.user_id === u.id)
+              if (u.role === 'admin') return 'All wings'
+              if (mine.length < 2) return mine[0]?.property_id ?? '—'
+              return (
+                <select aria-label={`Wing ${u.full_name} opens on`} className="rounded border border-navy/20 px-1 text-sm" value={mine.find((x) => x.is_default)?.property_id ?? ''}
+                  onChange={(e) => a.run(async () => { await m.setDefaultProperty(u.id, e.target.value); reload() }, 'Default wing saved')}>
+                  <option value="">First wing</option>
+                  {mine.map((x) => <option key={x.property_id} value={x.property_id}>{properties.find((p) => p.id === x.property_id)?.name ?? x.property_id}</option>)}
+                </select>
+              )
+            } },
             { key: 'is_active', label: 'Status', render: (u) => <StatusBadge value={u.is_active ? 'active' : 'inactive'} />, value: (u) => (u.is_active ? 'active' : 'inactive') },
             { key: 'x', label: '', noExport: true, render: (u) => u.id !== user.id && (
               <Small onClick={() => a.run(async () => { await setUserActive(u.id, !u.is_active); reload() })}>{u.is_active ? 'Deactivate' : 'Activate'}</Small>
             ) },
           ]} />
           <ActionMsg action={a} />
-          <p className="mt-2 text-xs text-slate-500">Managers see only the properties ticked here. Employee data permissions (contacts, payments, beds) are under Website & bookings → Employees.</p>
+          <p className="mt-2 text-xs text-slate-500">Managers see only the properties ticked here (tick both wings to let them see both). "Opens on" is the wing they see first each time they open the app. Employee data permissions (contacts, payments, beds) are under Website & bookings → Employees.</p>
           {creating && <CreateLogin onClose={() => setCreating(false)} onDone={() => { setCreating(false); reload() }} />}
         </>
       )}

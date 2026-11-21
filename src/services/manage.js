@@ -66,6 +66,12 @@ export const loadOccupants = () =>
 export const loadRentHistory = (roomId) => rows('rent_changes', '*', (q) => q.eq('room_id', roomId).order('created_at', { ascending: false }))
 export const assignMember = (pid, user, on) => rpc('admin_assign_member', { p_property: pid, p_user: user, p_assigned: on })
 export const loadMembers = () => rows('property_members', '*')
+export const setDefaultProperty = (user, pid) => rpc('admin_set_default_property', { p_user: user, p_property: pid || null })
+// The wing a login opens on: their default, else their first assigned property, else '' (all, the owner)
+export const loadStartProperty = (userId) => (userId
+  ? rows('property_members', 'property_id, is_default', (q) => q.eq('user_id', userId).order('property_id'))
+    .then((list) => (list.find((x) => x.is_default) ?? list[0])?.property_id ?? '')
+  : Promise.resolve(''))
 export const setRole = (user, role) => rpc('admin_set_role', { p_user: user, p_role: role })
 export const loadStaffLogins = () =>
   rows('profiles', 'id, full_name, phone, role, is_active, created_at', (q) => q.neq('role', 'customer').order('full_name'))

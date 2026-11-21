@@ -6,14 +6,16 @@ import { label } from '../../services/pg'
 // ---------------------------------------------------------------- property scope (owner switches property; '' = all)
 const ScopeContext = createContext({ property: '', setProperty: () => {}, properties: [] })
 export const useScope = () => useContext(ScopeContext)
-export function ScopeProvider({ properties, children }) {
+// Each visit opens on `initial` (the login's default wing); a switch is kept until the app is closed.
+export function ScopeProvider({ properties, initial = '', children }) {
   const [property, setPropertyState] = useState(() => {
-    try { return localStorage.getItem('yolo.property') ?? '' } catch { return '' }
+    try { return sessionStorage.getItem('yolo.property') } catch { return null }
   })
-  const valid = property === '' || properties.some((p) => p.id === property) ? property : ''
+  const chosen = property ?? initial
+  const valid = chosen === '' || properties.some((p) => p.id === chosen) ? chosen : ''
   const setProperty = (p) => {
     setPropertyState(p)
-    try { localStorage.setItem('yolo.property', p) } catch { /* private mode: keep it for this visit only */ }
+    try { sessionStorage.setItem('yolo.property', p) } catch { /* private mode: keep it in memory only */ }
   }
   return <ScopeContext.Provider value={{ property: valid, setProperty, properties }}>{children}</ScopeContext.Provider>
 }
