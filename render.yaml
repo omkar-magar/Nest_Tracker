@@ -1,6 +1,7 @@
 # Render Blueprint: creates the database, the API and the website in one go. See docs/render-deploy.md.
 # Only KEYS are listed for secrets (sync: false); Render asks you for the values in its dashboard.
-# Plan names and the region are what I believe Render offers; if the dashboard shows others, change them here.
+# Plan names checked against Render's docs on 2026-11-09. `starter` and `basic-256mb` are legacy names that still work in
+# Blueprints (same as the new 0.5c-512mb web / 0.1c-256mb Postgres). Switch to the new ids any time; specs and prices are identical.
 # Keep every service in ONE region, otherwise the private database connection does not work.
 
 databases:
