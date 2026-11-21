@@ -10,6 +10,7 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./tests/setup.js'],
     include: ['tests/**/*.test.{js,jsx}'],
+    exclude: ['tests/db/**', 'node_modules/**'], // SQL tests: npm run test:db
     css: false,
     // tests must not depend on a developer's local .env
     env: { VITE_PAYMENT_PROVIDER: 'demo', VITE_SUPABASE_URL: '', VITE_SUPABASE_ANON_KEY: '' },

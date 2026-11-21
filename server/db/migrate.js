@@ -13,7 +13,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../
 const LOCK_ID = 727274 // stops two deploys migrating at once
 
 // Supabase Storage is replaced by R2, so its bucket/policy migration is not applied.
-export const SKIPPED = new Set(['20261104000004_storage.sql'])
+export const SKIPPED = new Set(['20261104000004_storage.sql', '20261121000009_storage_pg.sql'])
 
 const sqlFiles = async (dir) => (await readdir(dir)).filter((f) => f.endsWith('.sql')).sort()
 

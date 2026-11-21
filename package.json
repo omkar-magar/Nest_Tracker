@@ -11,18 +11,23 @@
     "test:watch": "vitest",
     "db:migrate": "node server/db/migrate.js",
     "server": "node server/index.js",
-    "server:dev": "node --watch --env-file=server/.env server/index.js"
+    "server:dev": "node --watch --env-file=server/.env server/index.js",
+    "test:db": "vitest run --config vitest.db.config.js"
   },
   "dependencies": {
     "@photo-sphere-viewer/core": "^5.15.1",
     "@supabase/supabase-js": "^2.118.0",
     "express": "^5.3.0",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.9",
     "pg": "^8.23.1",
+    "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.30.6"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.3.15",
     "@tailwindcss/vite": "^4.3.4",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "^7.0.1",
