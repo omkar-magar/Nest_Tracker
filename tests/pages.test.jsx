@@ -265,6 +265,25 @@ describe('Rooms page (no backend)', () => {
     await userEvent.selectOptions(screen.getByLabelText('Sort by'), 'beds')
     expect(titles()[0]).toBe('Room 501') // 4 beds
   })
+  it('lets the visitor pick a wing, and shows the wing on each card', async () => {
+    renderAt(<Rooms />, '/rooms')
+    await screen.findByText(/rooms$/)
+    const both = screen.getByRole('button', { name: 'Both wings' })
+    expect(both).toHaveAttribute('aria-pressed', 'true')
+    await userEvent.click(screen.getByRole('button', { name: 'B wing' }))
+    const inB = staticRooms.filter((r) => r.wing === 'B')
+    expect(screen.getByText(`${inB.length} rooms in B wing`)).toBeInTheDocument()
+    expect(titles()).toEqual(inB.map((r) => `Room ${r.no}`))
+    expect(screen.getByRole('button', { name: 'B wing' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(cards()[0]).getByText(/B wing · Floor/)).toBeInTheDocument()
+    await userEvent.click(both)
+    expect(cards()).toHaveLength(staticRooms.length)
+  })
+  it('reads the wing from the URL and combines it with other filters', async () => {
+    renderAt(<Rooms />, '/rooms?wing=A&type=Non-AC')
+    expect(await screen.findByText('1 room in A wing')).toBeInTheDocument()
+    expect(titles()).toEqual(['Room 102'])
+  })
 })
 
 describe('Rooms page (with backend)', () => {

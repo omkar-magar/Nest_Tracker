@@ -41,7 +41,7 @@ export default function Beds() {
     const reservation = Object.fromEntries(resv.map((r) => [r.bed_id, r]))
     const floors = {}
     for (const r of rooms.filter((x) => x.is_active || manage)) {
-      const key = `${r.property_id} · Floor ${r.floor}`
+      const key = `${r.property_id} · ${r.wing} wing · Floor ${r.floor}`
       ;(floors[key] ??= []).push(r)
     }
     const all = rooms.flatMap((r) => r.beds.map((b) => ({ ...b, room: r })))

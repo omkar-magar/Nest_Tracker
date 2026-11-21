@@ -64,7 +64,7 @@ export default function RoomsBoard({ canManage = false }) {
           return (
             <Card key={r.id}>
               <div className="flex items-center justify-between">
-                <h3 className="font-semibold">Room {r.room_no} <span className="text-xs font-normal text-slate-500">F{r.floor} · {r.ac_type}</span></h3>
+                <h3 className="font-semibold">Room {r.room_no} <span className="text-xs font-normal text-slate-500">{r.wing ? `${r.wing} wing · ` : ''}F{r.floor} · {r.ac_type}</span></h3>
                 <Badge tone={s.tone}>{s.text}</Badge>
               </div>
               <ul className="mt-3 flex flex-wrap gap-2">

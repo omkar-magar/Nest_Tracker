@@ -53,15 +53,16 @@ export const categories = [
 // Room photo: public/images/rooms/<id>.webp   360 photo: public/images/360/<id>.jpg
 // With Supabase connected, rooms come from the database (supabase/seed.sql is the seed copy of this list).
 // This list is only the fallback when Supabase is not configured.
+// wing: 'A' or 'B' (the building the room is in; demo split, set the real one).
 // rentBasis: 'bed' = price per bed, 'room' = price for the whole room.   billing: 'month' | 'night'.
 // Prices and deposits below are demo values. Replace with the client's real prices.
 export const rooms = [
-  { id: 'pg-101', category: 'monthly-pg', no: '101', floor: 1, type: 'AC', beds: 2, rentBasis: 'bed', billing: 'month', price: 7500, deposit: 7500, features: ['AC', 'Furnished'] },
-  { id: 'pg-102', category: 'monthly-pg', no: '102', floor: 1, type: 'Non-AC', beds: 3, rentBasis: 'bed', billing: 'month', price: 6500, deposit: 6500, features: ['Furnished'] },
-  { id: 'dpg-201', category: 'daily-pg', no: '201', floor: 2, type: 'AC', beds: 2, rentBasis: 'bed', billing: 'night', price: 800, deposit: 0, features: ['AC', 'Furnished'] },
-  { id: 'flat-301', category: 'flat-1bhk', no: '301', floor: 3, type: 'AC', beds: 2, rentBasis: 'room', billing: 'month', price: 18000, deposit: 18000, features: ['AC', 'Furnished'] },
-  { id: 'lodge-401', category: 'lodge', no: '401', floor: 4, type: 'AC', beds: 2, rentBasis: 'room', billing: 'night', price: 1500, deposit: 0, features: ['AC'] },
-  { id: 'stay-501', category: 'airbnb', no: '501', floor: 5, type: 'AC', beds: 4, rentBasis: 'room', billing: 'night', price: 3200, deposit: 0, features: ['AC', 'Furnished'] },
+  { id: 'pg-101', wing: 'A', category: 'monthly-pg', no: '101', floor: 1, type: 'AC', beds: 2, rentBasis: 'bed', billing: 'month', price: 7500, deposit: 7500, features: ['AC', 'Furnished'] },
+  { id: 'pg-102', wing: 'A', category: 'monthly-pg', no: '102', floor: 1, type: 'Non-AC', beds: 3, rentBasis: 'bed', billing: 'month', price: 6500, deposit: 6500, features: ['Furnished'] },
+  { id: 'dpg-201', wing: 'A', category: 'daily-pg', no: '201', floor: 2, type: 'AC', beds: 2, rentBasis: 'bed', billing: 'night', price: 800, deposit: 0, features: ['AC', 'Furnished'] },
+  { id: 'flat-301', wing: 'B', category: 'flat-1bhk', no: '301', floor: 3, type: 'AC', beds: 2, rentBasis: 'room', billing: 'month', price: 18000, deposit: 18000, features: ['AC', 'Furnished'] },
+  { id: 'lodge-401', wing: 'B', category: 'lodge', no: '401', floor: 4, type: 'AC', beds: 2, rentBasis: 'room', billing: 'night', price: 1500, deposit: 0, features: ['AC'] },
+  { id: 'stay-501', wing: 'B', category: 'airbnb', no: '501', floor: 5, type: 'AC', beds: 4, rentBasis: 'room', billing: 'night', price: 3200, deposit: 0, features: ['AC', 'Furnished'] },
 ]
 
 // Common questions. The answers describe how this site works. Check the policy ones (cancellation,

@@ -21,7 +21,7 @@ export const cancelBooking = (id) => supabase.rpc('cancel_booking', { p_booking_
 
 export async function loadMyAccount(userId) {
   const [bookings, bills, payments, documents, review] = await Promise.all([
-    supabase.from('bookings').select('*, rooms(room_no, floor, ac_type, category_id), booking_beds(active, beds(label))')
+    supabase.from('bookings').select('*, rooms(wing, room_no, floor, ac_type, category_id), booking_beds(active, beds(label))')
       .eq('customer_id', userId).order('created_at', { ascending: false }),
     supabase.from('bills').select('*').eq('customer_id', userId).order('due_date'),
     supabase.from('payments').select('*, bills(description)').eq('customer_id', userId).order('created_at', { ascending: false }),
@@ -74,8 +74,8 @@ export const loadMyPermissions = (userId) =>
   supabase.from('employee_permissions').select('*').eq('employee_id', userId).maybeSingle().then(unwrap)
 
 export const loadBeds = () =>
-  supabase.from('rooms').select('id, room_no, floor, ac_type, rent_basis, category_id, beds(id, label, status, is_occupied)')
-    .eq('is_active', true).order('room_no').then(unwrap)
+  supabase.from('rooms').select('id, wing, room_no, floor, ac_type, rent_basis, category_id, beds(id, label, status, is_occupied)')
+    .eq('is_active', true).order('wing').order('room_no').then(unwrap)
 
 export const setBedStatus = (bedId, status) =>
   supabase.rpc('set_bed_status', { p_bed_id: bedId, p_status: status }).then(unwrap).then(freshCatalog)

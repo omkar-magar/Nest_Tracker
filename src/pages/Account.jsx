@@ -28,7 +28,7 @@ function BookingCard({ booking, onChanged }) {
     <Card>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h3 className="font-semibold">Room {booking.rooms.room_no} · Floor {booking.rooms.floor}</h3>
+          <h3 className="font-semibold">Room {booking.rooms.room_no}{booking.rooms.wing ? ` · ${booking.rooms.wing} wing` : ''} · Floor {booking.rooms.floor}</h3>
           <p className="text-sm text-slate-600">{booking.rooms.ac_type}{beds && ` · Bed ${beds}`}</p>
         </div>
         <Badge tone={booking.status === 'active' ? 'green' : booking.status === 'pending' ? 'amber' : 'gray'}>{booking.status}</Badge>

@@ -3,7 +3,27 @@ import { useSearchParams } from 'react-router-dom'
 import RoomCard from '../components/RoomCard'
 import { CardGridSkeleton, Empty, ErrorBox, Notice, PageHeader, inputCls } from '../components/ui'
 import useCatalog from '../hooks/useCatalog'
-import { availability, monthlyEquivalent } from '../services/catalog'
+import { availability, monthlyEquivalent, wingName, wingsOf } from '../services/catalog'
+
+const pill = 'rounded-full border px-4 py-2 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy'
+
+// The PG has two buildings; picking one narrows every other filter to that wing
+function WingPicker({ wings, value, onChange }) {
+  const options = [['', 'Both wings'], ...wings.map((w) => [w, wingName(w)])]
+  return (
+    <fieldset className="mb-4">
+      <legend className="mb-2 text-sm font-medium">Wing</legend>
+      <div className="flex flex-wrap gap-2">
+        {options.map(([id, name]) => (
+          <button key={id || 'all'} type="button" aria-pressed={value === id} onClick={() => onChange(id)}
+            className={`${pill} ${value === id ? 'border-navy bg-navy text-white' : 'border-navy/20 bg-white text-navy hover:border-navy/40'}`}>
+            {name}
+          </button>
+        ))}
+      </div>
+    </fieldset>
+  )
+}
 
 const sorters = {
   recommended: () => 0,
@@ -16,6 +36,7 @@ export default function Rooms() {
   const { data, error, loading, reload } = useCatalog()
   const [params, setParams] = useSearchParams()
   const f = {
+    wing: params.get('wing') || '',
     category: params.get('category') || '',
     type: params.get('type') || '',
     status: params.get('status') || '',
@@ -30,11 +51,13 @@ export default function Rooms() {
   const shown = useMemo(() => {
     if (!data) return []
     return data.rooms
+      .filter((r) => !f.wing || r.wing === f.wing)
       .filter((r) => !f.category || r.category === f.category)
       .filter((r) => !f.type || r.type === f.type)
       .filter((r) => !f.status || availability(r).status === f.status)
       .sort(sorters[f.sort] ?? sorters.recommended)
-  }, [data, f.category, f.type, f.status, f.sort])
+  }, [data, f.wing, f.category, f.type, f.status, f.sort])
+  const wings = useMemo(() => (data ? wingsOf(data.rooms) : []), [data])
 
   const names = data ? Object.fromEntries(data.categories.map((c) => [c.id, c.name])) : {}
 
@@ -52,6 +75,8 @@ export default function Rooms() {
             {data.rooms.some((r) => r.isDemoPrice) && (
               <div className="mb-4"><Notice>Prices shown are demo values and will change before launch.</Notice></div>
             )}
+
+            {wings.length > 1 && <WingPicker wings={wings} value={f.wing} onChange={(w) => set('wing', w)} />}
 
             <form className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="Filter rooms" onSubmit={(e) => e.preventDefault()}>
               <label className="text-sm font-medium">Category
@@ -85,7 +110,7 @@ export default function Rooms() {
               </label>
             </form>
 
-            <p className="mt-4 text-sm text-slate-600" aria-live="polite">{shown.length} room{shown.length === 1 ? '' : 's'}</p>
+            <p className="mt-4 text-sm text-slate-600" aria-live="polite">{shown.length} room{shown.length === 1 ? '' : 's'}{f.wing ? ` in ${wingName(f.wing)}` : ''}</p>
             {shown.length ? (
               <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {shown.map((r) => <RoomCard key={r.id} room={r} categoryName={names[r.category]} />)}

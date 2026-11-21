@@ -44,12 +44,12 @@ export async function createUser(fields) {
 export const loadProperties = () => rows('properties', '*', (q) => q.order('id'))
 export const loadFloors = (pid) => rows('floors', '*', (q) => q.eq('property_id', pid).order('number'))
 export const loadRoomsWithBeds = (pid) =>
-  rows('rooms', '*, beds(*)', (q) => (pid ? q.eq('property_id', pid) : q).order('floor').order('room_no'))
+  rows('rooms', '*, beds(*)', (q) => (pid ? q.eq('property_id', pid) : q).order('wing').order('floor').order('room_no'))
 export const saveRoom = (id, fields) => (id ? updateRow('rooms', id, fields) : insertRow('rooms', fields)).then(fresh)
 export const saveBed = (id, fields) => (id ? updateRow('beds', id, fields) : insertRow('beds', fields)).then(fresh)
 export const bulkCreateRooms = (a) => rpc('bulk_create_rooms', {
   p_property: a.property, p_floor: a.floor, p_first_room_no: a.first, p_count: a.count, p_beds_per_room: a.beds,
-  p_category: a.category, p_room_type: a.roomType, p_ac_type: a.ac, p_price: a.price, p_deposit: a.deposit, p_billing: a.billing,
+  p_category: a.category, p_room_type: a.roomType, p_ac_type: a.ac, p_price: a.price, p_deposit: a.deposit, p_billing: a.billing, p_wing: a.wing,
 }).then(fresh)
 export const setFloorActive = (pid, floor, active) => rpc('set_floor_active', { p_property: pid, p_floor: floor, p_active: active }).then(fresh)
 export const setBedBlock = (bed, status, reason) => rpc('set_bed_block', { p_bed: bed, p_status: status, p_reason: reason || null }).then(fresh)

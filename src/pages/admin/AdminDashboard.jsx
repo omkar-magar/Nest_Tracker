@@ -147,7 +147,7 @@ function RoomEditor({ room, onSaved }) {
   return (
     <tr>
       <td className="px-4 py-3 font-medium">Room {room.no}</td>
-      <td className="px-4 py-3">{room.type} · F{room.floor} · {room.totalBeds} beds</td>
+      <td className="px-4 py-3">{room.wing ? `${room.wing} wing · ` : ''}{room.type} · F{room.floor} · {room.totalBeds} beds</td>
       <td className="px-4 py-3"><input aria-label={`Price for room ${room.no}`} className={`${inputCls} w-28`} type="number" min="1" value={price} onChange={(e) => setPrice(Number(e.target.value))} /></td>
       <td className="px-4 py-3"><input aria-label={`Deposit for room ${room.no}`} className={`${inputCls} w-28`} type="number" min="0" value={deposit} onChange={(e) => setDeposit(Number(e.target.value))} /></td>
       <td className="px-4 py-3">

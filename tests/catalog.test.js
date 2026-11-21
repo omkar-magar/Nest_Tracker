@@ -4,7 +4,7 @@ vi.mock('../src/lib/supabase', () => import('./helpers/supabaseMock.js'))
 
 import { db, resetMock, setConfigured, supabase } from './helpers/supabaseMock.js'
 import {
-  availability, loadAmenities, loadCatalog, loadPublishedReviews, monthlyEquivalent, previewRooms, priceLabel, subscribeAvailability,
+  availability, loadAmenities, loadCatalog, loadPublishedReviews, monthlyEquivalent, previewRooms, priceLabel, subscribeAvailability, wingsOf,
 } from '../src/services/catalog'
 import { rooms as staticRooms } from '../src/data/site'
 
@@ -212,5 +212,14 @@ describe('loadPublishedReviews()', () => {
   it('throws on a database error', async () => {
     db.tables.reviews = { data: null, error: new Error('nope') }
     await expect(loadPublishedReviews()).rejects.toThrow('nope')
+  })
+})
+
+describe('wingsOf', () => {
+  it('lists each wing that has rooms once, in order', () => {
+    expect(wingsOf([{ wing: 'B' }, { wing: 'A' }, { wing: 'B' }, {}])).toEqual(['A', 'B'])
+  })
+  it('every static room belongs to a wing', () => {
+    expect(staticRooms.every((r) => /^[A-Z]$/.test(r.wing))).toBe(true)
   })
 })

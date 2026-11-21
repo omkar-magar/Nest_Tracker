@@ -63,7 +63,7 @@ export default function Book() {
           <Img src={room.image} alt={`Room ${room.no}`} className="h-48 w-full object-cover" />
           <div className="p-5">
             <p className="font-semibold">{priceLabel(room)}</p>
-            <p className="text-sm text-slate-600">{room.type} · Floor {room.floor} · {a.free ?? '?'} of {a.total} beds free</p>
+            <p className="text-sm text-slate-600">{room.wing ? `${room.wing} wing · ` : ''}{room.type} · Floor {room.floor} · {a.free ?? '?'} of {a.total} beds free</p>
           </div>
         </Card>
 

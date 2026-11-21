@@ -32,12 +32,12 @@ function RoomCard({ room, categoryName }) {
 
   return (
     <article className="flex flex-col overflow-hidden rounded-2xl border border-navy/10 bg-white">
-      <Img src={room.image} alt={`Room ${room.no}, ${room.type}`} className="h-44 w-full object-cover" />
+      <Img src={room.image} alt={`Room ${room.no}, ${room.wing ? `${room.wing} wing, ` : ''}${room.type}`} className="h-44 w-full object-cover" />
       <div className="flex flex-1 flex-col p-4">
         <div className="flex items-start justify-between gap-2">
           <div>
             <h3 className="font-semibold text-navy">Room {room.no}</h3>
-            <p className="text-xs text-slate-500">{categoryName} · Floor {room.floor}</p>
+            <p className="text-xs text-slate-500">{categoryName}{room.wing ? ` · ${room.wing} wing` : ''} · Floor {room.floor}</p>
           </div>
           <AvailabilityBadge room={room} />
         </div>

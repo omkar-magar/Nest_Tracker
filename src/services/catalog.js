@@ -7,6 +7,7 @@ function fromRow(r, beds) {
   return {
     id: r.id,
     category: r.category_id,
+    wing: r.wing,
     no: r.room_no,
     floor: r.floor,
     type: r.ac_type,
@@ -26,7 +27,7 @@ function fromRow(r, beds) {
 
 function fromStatic(r) {
   return {
-    id: r.id, category: r.category, no: r.no, floor: r.floor, type: r.type, description: '',
+    id: r.id, category: r.category, wing: r.wing, no: r.no, floor: r.floor, type: r.type, description: '',
     features: r.features, image: `/images/rooms/${r.id}.webp`, rentBasis: r.rentBasis, billing: r.billing,
     price: r.price, deposit: r.deposit, isDemoPrice: true, isActive: true,
     beds: null, totalBeds: r.beds, // null beds = availability unknown (no backend)
@@ -34,7 +35,7 @@ function fromStatic(r) {
 }
 
 // Only the columns the UI reads: keeps responses small as the tables grow.
-const ROOM_COLS = 'id, category_id, room_no, floor, ac_type, description, features, image_url, rent_basis, billing_period, price, deposit, is_active, is_demo_price'
+const ROOM_COLS = 'id, category_id, wing, room_no, floor, ac_type, description, features, image_url, rent_basis, billing_period, price, deposit, is_active, is_demo_price'
 
 // Categories, rooms and bed availability: the part that changes, so useCatalog keeps it fresh.
 export async function loadCatalog() {
@@ -43,7 +44,7 @@ export async function loadCatalog() {
   }
   const [cats, rms, beds] = await Promise.all([
     supabase.from('categories').select('id, name, tag').order('sort_order'),
-    supabase.from('rooms').select(ROOM_COLS).eq('is_active', true).order('room_no'),
+    supabase.from('rooms').select(ROOM_COLS).eq('is_active', true).order('wing').order('room_no'),
     supabase.from('beds').select('id, room_id, label, status, is_occupied, is_reserved, is_active').order('label'),
   ])
   const failed = [cats, rms, beds].find((r) => r.error)
@@ -122,3 +123,7 @@ export function previewRooms(rooms) {
   if (pool.length <= 3) return pool
   return [pool[0], pool[Math.floor(pool.length / 2)], pool[pool.length - 1]]
 }
+
+// Wings that have at least one room, in order (A, B, …), for the wing picker
+export const wingsOf = (rooms) => [...new Set(rooms.map((r) => r.wing).filter(Boolean))].sort()
+export const wingName = (wing) => `${wing} wing`

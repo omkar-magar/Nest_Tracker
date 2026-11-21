@@ -95,7 +95,7 @@ export default function CheckIn() {
           <Field label="Room (rooms with a free bed)">
             <select className={inputCls} value={room?.id ?? ''} onChange={(e) => pickRoom(e.target.value)} required>
               <option value="">Choose a room</option>
-              {view.rooms.map((r) => <option key={r.id} value={r.id}>Floor {r.floor} · Room {r.room_no} · {label(r.room_type)} · {r.ac_type} · {rupees(r.price)}/{r.billing_period}</option>)}
+              {view.rooms.map((r) => <option key={r.id} value={r.id}>{r.wing} wing · Floor {r.floor} · Room {r.room_no} · {label(r.room_type)} · {r.ac_type} · {rupees(r.price)}/{r.billing_period}</option>)}
             </select>
           </Field>
         </div>

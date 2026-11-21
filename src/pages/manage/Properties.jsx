@@ -11,6 +11,7 @@ import { formatDate, rupees } from '../../services/format'
 const ROOM_FIELDS = (properties, categories) => [
   { key: 'id', label: 'Room id (used for photo file names)', required: true, help: 'e.g. p1-204. Cannot be changed later.' },
   { key: 'property_id', label: 'Property', type: 'select', required: true, options: properties.map((p) => [p.id, `${p.id} · ${p.name}`]) },
+  { key: 'wing', label: 'Wing', type: 'select', required: true, options: [['A', 'A wing'], ['B', 'B wing']] },
   { key: 'room_no', label: 'Room number', required: true },
   { key: 'floor', label: 'Floor', type: 'number', required: true },
   { key: 'category_id', label: 'Category', type: 'select', required: true, options: categories.map((c) => [c.id, c.name]) },
@@ -40,7 +41,7 @@ function PropertiesTab() {
       ]}
       toForm={(r) => ({ ...r, photos: (r.photos || []).join(', ') })}
       fields={[
-        { key: 'id', label: 'Code (P1, P2…)', required: true, disabled: role !== 'admin', help: 'Capital letters / digits; used in bed ids like P1-F2-R204-B1.' },
+        { key: 'id', label: 'Code (P1, P2…)', required: true, disabled: role !== 'admin', help: 'Capital letters / digits; used in bed ids like P1-A-F2-R204-B1.' },
         { key: 'name', label: 'Name', required: true }, { key: 'city', label: 'City' },
         { key: 'address', label: 'Address', type: 'textarea' },
         { key: 'map_query', label: 'Google Maps location (search text or link)', span: true },
@@ -115,7 +116,7 @@ function RoomsTab() {
       {([rooms, categories, floors], reload) => (
         <div>
           <div className="mb-4 flex flex-wrap gap-2">
-            <Button onClick={() => setEditing({ property_id: property || properties[0]?.id, floor: 1, room_type: 'double', ac_type: 'AC', furnishing: 'furnished',
+            <Button onClick={() => setEditing({ property_id: property || properties[0]?.id, wing: 'A', floor: 1, room_type: 'double', ac_type: 'AC', furnishing: 'furnished',
               rent_basis: 'bed', billing_period: 'month', attached_bathroom: true, is_active: true, category_id: categories[0]?.id })}>Add room</Button>
             <Button variant="outline" onClick={() => setBulk(true)}>Bulk create rooms</Button>
           </div>
@@ -134,7 +135,7 @@ function RoomsTab() {
               <Card key={r.id} className="!p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <p className="font-semibold">{r.property_id} · Room {r.room_no} <span className="font-normal text-slate-500">floor {r.floor}</span></p>
+                    <p className="font-semibold">{r.property_id} · {r.wing} wing · Room {r.room_no} <span className="font-normal text-slate-500">floor {r.floor}</span></p>
                     <p className="text-xs text-slate-600">{label(r.room_type)} · {r.ac_type} · {r.attached_bathroom ? 'attached bath' : 'common bath'} · {label(r.furnishing)} · {rupees(r.price)}/{r.billing_period} per {r.rent_basis} · deposit {rupees(r.deposit)}</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -199,7 +200,7 @@ function RoomModal({ room, fields, onClose, onSaved }) {
 
 function BulkModal({ categories, onClose, onSaved }) {
   const { property, properties } = useScope()
-  const [v, setV] = useState({ property: property || properties[0]?.id, floor: 1, first: 101, count: 10, beds: 3, category: categories[0]?.id,
+  const [v, setV] = useState({ property: property || properties[0]?.id, wing: 'A', floor: 1, first: 101, count: 10, beds: 3, category: categories[0]?.id,
     roomType: 'triple', ac: 'AC', price: '', deposit: '', billing: 'month' })
   const a = useAction()
   const submit = async (e) => {
@@ -213,6 +214,7 @@ function BulkModal({ categories, onClose, onSaved }) {
       <form onSubmit={submit} className="space-y-4">
         <FormFields value={v} onChange={setV} fields={[
           { key: 'property', label: 'Property', type: 'select', required: true, options: properties.map((p) => [p.id, p.name]) },
+          { key: 'wing', label: 'Wing', type: 'select', required: true, options: [['A', 'A wing'], ['B', 'B wing']] },
           { key: 'floor', label: 'Floor', type: 'number', required: true },
           { key: 'first', label: 'First room number', type: 'number', required: true },
           { key: 'count', label: 'How many rooms', type: 'number', required: true, min: 1, max: 100 },
@@ -224,7 +226,7 @@ function BulkModal({ categories, onClose, onSaved }) {
           { key: 'deposit', label: 'Deposit per bed (₹)', type: 'number', min: 0 },
           { key: 'billing', label: 'Billing', type: 'select', required: true, options: [['month', 'Monthly'], ['night', 'Nightly']] },
         ]} />
-        <p className="text-sm text-slate-600">Creates rooms {v.first} to {Number(v.first) + Number(v.count) - 1}, each with {v.beds} bed(s).</p>
+        <p className="text-sm text-slate-600">Creates {v.wing} wing rooms {v.first} to {Number(v.first) + Number(v.count) - 1}, each with {v.beds} bed(s).</p>
         <ActionMsg action={a} />
         <div className="flex gap-2"><Button type="submit" disabled={a.busy}>{a.busy ? 'Creating…' : 'Create'}</Button><Button variant="outline" onClick={onClose}>Cancel</Button></div>
       </form>
@@ -242,10 +244,10 @@ function RevenueTab() {
     <Load loader={() => Promise.all([m.rpc('report_rent_collection', { p_from: from, p_to: to, p_property: property || null }), m.loadRoomsWithBeds(property)])} deps={[property]}>
       {([bills, rooms]) => {
         const byRoom = rooms.map((r) => {
-          const mine = bills.filter((b) => b.room_no === r.room_no && b.property_id === r.property_id && b.kind !== 'deposit')
+          const mine = bills.filter((b) => b.room_id === r.id && b.kind !== 'deposit')
           const beds = r.beds.filter((b) => b.is_active)
           return {
-            id: r.id, room: `${r.property_id} · ${r.room_no}`, beds: beds.length,
+            id: r.id, room: `${r.property_id} · ${r.wing}-${r.room_no}`, beds: beds.length,
             rent_per_bed: beds.map((b) => b.rent ?? r.price).join(' / '),
             tenants: [...new Set(mine.map((b) => b.tenant))].join(', '),
             expected: mine.reduce((s, b) => s + b.billed, 0), collected: mine.reduce((s, b) => s + b.collected, 0),
