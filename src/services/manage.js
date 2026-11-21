@@ -222,6 +222,13 @@ export const updatePayslip = (id, bonus, deductions, notes) =>
   rpc('update_payslip', { p_id: id, p_bonus: Number(bonus || 0), p_other_deductions: Number(deductions || 0), p_notes: notes || '' })
 export const payPayslip = (id, mode, ref, date) => rpc('pay_payslip', { p_id: id, p_mode: mode, p_reference: ref || '', p_date: date })
 export const completeTask = (id, photo, notes) => rpc('complete_task', { p_id: id, p_photo: photo || null, p_notes: notes || '' })
+export const loadMyStaff = (userId) => rows('staff_members', 'id, full_name, designation, property_id', (q) => q.eq('user_id', userId).maybeSingle())
+// Manager's team view: active staff of their properties (RLS limits the rows), today's attendance, pending leave
+export const loadTeamToday = (date) => Promise.all([
+  rows('staff_members', 'id, full_name, designation, phone, property_id', (q) => q.eq('status', 'active').order('designation').order('full_name')),
+  rows('attendance', 'staff_id, status, check_in_at, check_out_at, distance_m', (q) => q.eq('work_date', date)),
+  rows('leave_requests', 'id, staff_id, leave_type, from_date, to_date, days, reason', (q) => q.eq('status', 'pending').order('from_date')),
+])
 
 // ---------------------------------------------------------------- dashboards, reports, settings, inbox
 export const ownerDashboard = (pid) => rpc('owner_dashboard', { p_property: pid || null })

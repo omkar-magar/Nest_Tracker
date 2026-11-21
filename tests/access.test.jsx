@@ -18,6 +18,7 @@ describe('homeFor', () => {
     expect(homeFor('customer')).toBe('/account')
     expect(homeFor('employee')).toBe('/staff')
     expect(homeFor('admin')).toBe('/admin')
+    expect(homeFor('manager')).toBe('/staff/manager')
   })
   it('sends unknown or missing roles to the login page', () => {
     expect(homeFor(null)).toBe('/login')

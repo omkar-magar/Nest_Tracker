@@ -9,7 +9,7 @@ import { formatDate, formatDateTime, rupees } from '../../services/format'
 
 // The employee's own screens: attendance check-in with selfie and GPS, today's checklist, assigned complaints,
 // leave and payslips. Everything is limited to their own rows by RLS.
-const me = (userId) => m.rows('staff_members', 'id, full_name, designation, property_id', (q) => q.eq('user_id', userId).maybeSingle())
+const me = m.loadMyStaff
 
 function position() {
   return new Promise((resolve, reject) => {

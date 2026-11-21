@@ -10,7 +10,7 @@ const links = [
   ['Contact', '/#contact'],
 ]
 
-export const homeFor = (role) => ({ customer: '/account', employee: '/staff', admin: '/admin', manager: '/admin', sales: '/admin' })[role] ?? '/login'
+export const homeFor = (role) => ({ customer: '/account', employee: '/staff', admin: '/admin', manager: '/staff/manager', sales: '/admin' })[role] ?? '/login'
 
 const navCls = ({ isActive }) => `transition-colors hover:text-navy ${isActive ? 'font-semibold text-navy' : ''}`
 

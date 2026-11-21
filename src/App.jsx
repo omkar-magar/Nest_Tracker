@@ -20,7 +20,9 @@ import useCampaignTracking from './hooks/useCampaignTracking'
 // Signed-in areas load on demand: a visitor browsing the public site never downloads the dashboards or the payment code.
 const Book = lazy(() => import('./pages/Book'))
 const Account = lazy(() => import('./pages/Account'))
-const StaffDashboard = lazy(() => import('./pages/staff/StaffDashboard'))
+const StaffHome = lazy(() => import('./pages/staff/StaffHome'))
+const ManagerDashboard = lazy(() => import('./pages/staff/ManagerDashboard'))
+const CaretakerDashboard = lazy(() => import('./pages/staff/CaretakerDashboard'))
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'))
 const ResetPassword = lazy(() => import('./pages/ResetPassword'))
 const Vacancies = lazy(() => import('./pages/Vacancies'))
@@ -121,7 +123,9 @@ export default function App() {
 
         <Route element={<AppLayout />}>
           <Route path="staff/login" element={<Login audience="employee" />} />
-          <Route path="staff" element={<RequireRole roles={['employee', 'admin', 'manager']} loginPath="/staff/login"><StaffDashboard /></RequireRole>} />
+          <Route path="staff" element={<RequireRole roles={['employee', 'admin', 'manager']} loginPath="/staff/login"><StaffHome /></RequireRole>} />
+          <Route path="staff/manager" element={<RequireRole roles={['manager', 'admin']} loginPath="/staff/login"><ManagerDashboard /></RequireRole>} />
+          <Route path="staff/caretaker" element={<RequireRole roles={['employee', 'admin']} loginPath="/staff/login"><CaretakerDashboard /></RequireRole>} />
           <Route path="admin/login" element={<Login audience="admin" />} />
           <Route path="brochure" element={<Brochure />} />
           <Route path="admin" element={<RequireRole roles={['admin', 'manager', 'sales']} loginPath="/admin/login"><ManageLayout /></RequireRole>}>
