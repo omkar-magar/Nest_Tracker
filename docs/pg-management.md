@@ -8,13 +8,59 @@ database: RLS policies and RPCs in `supabase/migrations/2026112100000[1-9]_*.sql
 | PRD role | `profiles.role` | Opens | Sees |
 |---|---|---|---|
 | Super Admin / Owner | `admin` | `/admin` (all modules), `/staff` | everything, every property |
-| Property Manager | `manager` | `/admin` (no Settings / Website), `/staff` | only properties ticked for them in Settings → Users |
-| Staff | `employee` | `/staff` | own tasks, attendance, assigned complaints, leave, payslips |
+| Property Manager | `manager` | `/staff/manager` (their day), `/admin` (no Settings / Website) | only properties ticked for them in Settings → Users |
+| Caretaker | `employee` + staff designation `caretaker` | `/staff/caretaker` | own tasks, attendance, assigned complaints, beds, leave, payslips |
+| Other staff | `employee` | `/staff` | own tasks, attendance, assigned complaints, leave, payslips |
 | Sales / Marketing | `sales` | `/admin` → Beds, Enquiries, Marketing & sales | leads assigned to them or their properties |
 | Tenant | `customer` | `/account` | own stay, invoices, documents, complaints, agreement, notices |
 
 Owner creates logins in **Settings & users → Create login** (Edge Function `create-user`), sets roles, and
 assigns properties. Managers register tenants (login by mobile OTP; email optional).
+
+**Wings.** A wing and B wing are two properties: `P1` = A wing, `P2` = B wing (`properties.wing`; a room always
+takes its property's wing). Beds, tenants, bills, expenses, staff, complaints and reports are kept apart per wing.
+The switcher's "All wings · grand total" adds them up, and the dashboard then shows a wing-by-wing table first.
+Managers ticked for both wings see both. Each login opens on its default wing (Settings → Users → Opens on,
+`admin_set_default_property`; else its first wing; the owner opens on the grand total). A switch lasts until the
+app is closed. Migration `20261121160000_split_wings.sql` moved B wing rooms and their stays, deposits, agreements,
+complaints, tenants and register rows to `P2`. Expenses, staff, enquiries and sales rows had no room, so they stayed
+in A wing: move any that belong to B wing by hand.
+
+`/staff` sends each login to its page: role `manager` to `/staff/manager` (today's beds and rent, arrivals and
+departures, team attendance and pending leave, open complaints, with links into `/admin`); an employee whose staff
+profile (Employees, linked login) has designation `caretaker` to `/staff/caretaker`; everyone else stays on `/staff`.
+
+## Guest register
+A room-by-room guest list that needs no tenant logins: the stand-alone "PG Manager" page (`guests` / `guest_history`
+in its own Supabase project) moved into the app. Schema, RLS and RPCs: `supabase/migrations/20261121152007_guest_register.sql`;
+helpers in `src/services/register.js`; screens in `src/components/register/`.
+
+- **Where**: Manager page → Guest register, `/admin/register` (owner and managers edit); Caretaker page → Guest register
+  (read-only, only when "view customers" is on for that login). Cooks, security and other staff do not see it.
+- **Per guest**: room, name, contact, rent and deposit with status, check-in date, expected check-out date, notes. Edit
+  mode saves each field as you leave it.
+- **Room type is counted, not typed**: 1 named guest in a room = Rented, 2 or more = PG, none = Empty. The stat cards show
+  rooms occupied, PG rooms with how many people share them, rented rooms and empty rooms; they change as guests are added,
+  moved or checked out. The bed board (Rooms and beds) shows the same PG / rented split from occupied beds
+  (`rent_basis = 'room'` counts as rented).
+- **Delete = check out**: the button asks for a check-out date (today by default) and a note, and the guest moves to
+  **Past guests** (`checked_out_on`), which keeps check-in, check-out, days stayed, rent and deposit. "Undo check-out"
+  brings them back. Only an entry without a name is removed outright.
+- **Change history**: every add, edit, check-out and removal, with who made it; "Restore previous" undoes one entry.
+- **Exports**: Excel, PDF, and Backup (JSON: current guests, past guests, latest 500 history rows).
+- **AI link guide**: the same `?changes=[...]` links as the old page, now pointing at `/staff/manager`. Old links with
+  `flat` and labels such as `"Paid"` still work; `delete` / `checkout` checks the guest out (today unless a `date` is given).
+  Nothing is saved until Apply.
+
+### Moving the old building in
+1. Owner: Properties & rooms → add the property and its rooms (the old page had floors 1-5, rooms x01-x06), and assign the manager.
+2. Get the old data: either press **Backup (JSON)** in the old page, or run
+   `OLD_SUPABASE_URL=... OLD_SUPABASE_KEY=... OLD_EMAIL=... OLD_PASSWORD=... node scripts/fetch-old-register.mjs`
+   (the old project only lets a signed-in staff login read; the file goes to the git-ignored `register-backups/`).
+3. Guest register → Import and AI link → choose the file. Guests deleted in the old page can be added to Past guests
+   (check-out date = the day they were deleted); untick that if some deletions were mistakes. Non-numeric rent or deposit
+   text and bad phone numbers are kept in Notes. A CSV with the export's headers works too (for the next building's Excel:
+   save it as CSV).
 
 ## Setup
 1. Run the new migrations in order (`supabase db push`, or paste them into the SQL editor). `..._01_roles.sql` must be
@@ -51,8 +97,8 @@ recurring expenses · overdue complaint escalation · preventive maintenance tic
 visit and follow-up reminders · agreement renewal alerts (30 days) · referral rewards · owner's monthly email report (1st–3rd).
 
 ## Tests
-`npm test` (UI, mocked Supabase) and `npm run test:db` (all migrations in an in-process Postgres via PGlite; 33 tests on
-billing, check-in/out, RLS, complaints, sales, payroll, reports, jobs). The DB tests run one file at a time with
+`npm test` (UI, mocked Supabase) and `npm run test:db` (all migrations in an in-process Postgres via PGlite; tests on
+billing, check-in/out, RLS, complaints, sales, payroll, reports, jobs, guest register). The DB tests run one file at a time with
 `--liftoff-only` because V8's optimising wasm compiler runs out of memory on this machine.
 
 ## Not done / needs a decision
