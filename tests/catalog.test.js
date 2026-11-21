@@ -144,7 +144,7 @@ describe('loadCatalog() with Supabase', () => {
   it('loads amenities on their own, without touching rooms or beds', async () => {
     rows()
     const out = await loadAmenities()
-    expect(out.amenities[0]).toEqual({ id: 'a1', title: 'Gym', text: 'Lift', icon: '🏋️', image: '/g.webp' })
+    expect(out.amenities[0]).toEqual({ id: 'a1', title: 'Gym', text: 'Lift', icon: '🏋️', image: '/g.webp', pano: '/images/360/gym.jpg' })
     expect(db.queries.map((q) => q.table)).toEqual(['amenities'])
   })
   it('does not query amenities as part of the catalogue', async () => {

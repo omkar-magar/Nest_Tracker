@@ -1,16 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
 import Img from './Img'
 import NearbyMap from './NearbyMap'
+import PanoButton from './PanoButton'
 import useMediaQuery from '../hooks/useMediaQuery'
 import useFocusTour from '../hooks/useFocusTour'
 import { brand } from '../data/site'
+import { amenityPano } from '../lib/pano'
 
 // Replace the image paths and text with your real amenities.
+// pano: the same 360 photo as the Amenities page (public/images/360/<amenity-title>.jpg). Until it exists the button shows the normal photo.
 const amenities = [
-  { title: 'Gym', info: 'Fully equipped gym open all day for residents.', src: '/images/hero/gym.webp' },
-  { title: 'Gaming Zone', info: 'Console and board games to unwind after work.', src: '/images/hero/gaming.webp' },
-  { title: 'Pickleball Court', info: 'Play with housemates on our own court.', src: '/images/hero/pickleball.webp' },
-  { title: 'Café Area', info: 'A cosy space to work, chat or grab a coffee.', src: '/images/hero/cafe.webp' },
+  { title: 'Gym', info: 'Fully equipped gym open all day for residents.', src: '/images/hero/gym.webp', pano: amenityPano('Gym') },
+  { title: 'Gaming Zone', info: 'Console and board games to unwind after work.', src: '/images/hero/gaming.webp', pano: amenityPano('Gaming zone') },
+  { title: 'Pickleball Court', info: 'Play with housemates on our own court.', src: '/images/hero/pickleball.webp', pano: amenityPano('Pickleball court') },
+  { title: 'Café Area', info: 'A cosy space to work, chat or grab a coffee.', src: '/images/hero/cafe.webp', pano: amenityPano('Chill café area') },
 ]
 
 export default function Hero({ scrollTo }) {
@@ -18,7 +21,18 @@ export default function Hero({ scrollTo }) {
   const wide = useMediaQuery('(min-width: 1024px)') // lg: only the background for this size is downloaded
 
   const show = (idx) => setActive(idx)
-  const reset = () => setActive(null)
+  const reset = () => { cancelHover(); setActive(null) }
+
+  // Mouse: switching away from an open photo waits a moment, so the pointer can cross the other
+  // slices on its way to the 360 button (bottom left) without changing the photo
+  const hoverTimer = useRef(null)
+  const cancelHover = () => clearTimeout(hoverTimer.current)
+  const hoverShow = (idx) => {
+    cancelHover()
+    if (active === null) show(idx)
+    else if (idx !== active) hoverTimer.current = setTimeout(() => show(idx), 250)
+  }
+  useEffect(() => cancelHover, [])
 
   // Touch: a photo was already open when the tap started, so this tap closes it
   const wasOpen = useRef(false)
@@ -158,11 +172,11 @@ export default function Hero({ scrollTo }) {
                 tabIndex={0}
                 role="button"
                 aria-label={a.title}
-                onPointerEnter={(e) => e.pointerType === 'mouse' && show(idx)}
+                onPointerEnter={(e) => e.pointerType === 'mouse' && hoverShow(idx)}
                 onPointerDown={(e) => { wasOpen.current = e.pointerType === 'touch' && active !== null }}
                 onClick={() => (wasOpen.current ? reset() : show(idx))}
                 onFocus={() => show(idx)}
-                onBlur={reset}
+                onBlur={(e) => !panel.current?.contains(e.relatedTarget) && reset()}
                 className="relative min-h-0 min-w-0 flex-1 cursor-pointer focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-sun"
               >
                 {/* Collapsed title: plain horizontal text; a soft shadow keeps it readable over the photo */}
@@ -185,8 +199,22 @@ export default function Hero({ scrollTo }) {
               className={`pointer-events-none absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-navy/90 via-navy/70 to-transparent p-4 pt-12 transition-[opacity,translate] duration-700 ease-in-out motion-reduce:transition-none md:p-5 md:pt-14 ${idx === focused ? 'translate-y-0 opacity-100' : 'translate-y-3 opacity-0'
                 }`}
             >
-              <h3 className="text-lg font-bold text-gold md:text-xl">{a.title}</h3>
-              <p className="mt-1 text-sm text-white">{a.info}</p>
+              {/* the shown photo's text + button hold the photo while the pointer is on them */}
+              <div
+                className={`w-fit max-w-full ${idx === focused ? 'pointer-events-auto' : ''}`}
+                onPointerEnter={cancelHover}
+              >
+                <h3 className="text-lg font-bold text-gold md:text-xl">{a.title}</h3>
+                <p className="mt-1 text-sm text-white">{a.info}</p>
+                {/* only the shown photo's button is clickable and in the tab order */}
+                <PanoButton
+                  src={a.pano}
+                  fallback={a.src}
+                  title={a.title}
+                  tabIndex={idx === focused ? 0 : -1}
+                  className="mt-3"
+                />
+              </div>
             </div>
           ))}
         </div>

@@ -372,15 +372,15 @@ describe('Hero', () => {
     renderAt(<Hero scrollTo={() => {}} />)
     const gym = screen.getByRole('button', { name: 'Gym' })
     const info = screen.getByText('Fully equipped gym open all day for residents.')
-    expect(info.parentElement.className).toContain('opacity-0')
+    expect(info.closest('.z-20').className).toContain('opacity-0')
     fireEvent.focus(gym)
-    expect(info.parentElement.className).toContain('opacity-100')
+    expect(info.closest('.z-20').className).toContain('opacity-100')
     fireEvent.blur(gym)
-    expect(info.parentElement.className).toContain('opacity-0')
+    expect(info.closest('.z-20').className).toContain('opacity-0')
   })
 
   describe('timed amenity tour', () => {
-    const shown = (text) => screen.getByText(text).parentElement.className.includes('opacity-100')
+    const shown = (text) => screen.getByText(text).closest('.z-20').className.includes('opacity-100')
     const GYM = 'Fully equipped gym open all day for residents.'
     const GAMING = 'Console and board games to unwind after work.'
     const advance = (ms) => act(() => { vi.advanceTimersByTime(ms) })

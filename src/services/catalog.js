@@ -1,4 +1,5 @@
 import { supabase, isConfigured } from '../lib/supabase'
+import { amenityPano } from '../lib/pano'
 import { amenities as staticAmenities, categories as staticCategories, rooms as staticRooms } from '../data/site'
 
 // One room shape for the whole UI, whether it came from Supabase or the static fallback in site.js.
@@ -59,11 +60,11 @@ export async function loadCatalog() {
 // Amenities change rarely and have nothing to do with rooms or beds, so they load on their own (Amenities page).
 export async function loadAmenities() {
   if (!isConfigured) {
-    return { live: false, amenities: staticAmenities.map((a) => ({ id: a.title, title: a.title, text: a.text, icon: a.icon, image: a.image })) }
+    return { live: false, amenities: staticAmenities.map((a) => ({ id: a.title, title: a.title, text: a.text, icon: a.icon, image: a.image, pano: amenityPano(a.title) })) }
   }
   const { data, error } = await supabase.from('amenities').select('id, title, description, icon, image_url').order('sort_order')
   if (error) throw error
-  return { live: true, amenities: data.map((a) => ({ id: a.id, title: a.title, text: a.description, icon: a.icon, image: a.image_url })) }
+  return { live: true, amenities: data.map((a) => ({ id: a.id, title: a.title, text: a.description, icon: a.icon, image: a.image_url, pano: amenityPano(a.title) })) }
 }
 
 // Calls back whenever any bed or room row changes. Returns an unsubscribe function.

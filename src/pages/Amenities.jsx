@@ -1,4 +1,5 @@
 import Img from '../components/Img'
+import PanoButton from '../components/PanoButton'
 import { Button, ErrorBox, PageHeader, Spinner } from '../components/ui'
 import useQuery from '../hooks/useQuery'
 import { loadAmenities } from '../services/catalog'
@@ -22,9 +23,13 @@ export default function Amenities() {
                     <span className="absolute bottom-2 left-3 rounded-full bg-white/90 px-2.5 py-0.5 text-[11px] font-semibold text-navy">
                       Actual photo · YOLO Nest
                     </span>
+                    <PanoButton src={a.pano} fallback={a.image} title={a.title} className="absolute right-3 top-3" />
                   </div>
                 ) : (
-                  <div className="flex h-52 items-center justify-center bg-cream text-6xl" aria-hidden="true">{a.icon}</div>
+                  <div className="relative flex h-52 items-center justify-center bg-cream">
+                    <span className="text-6xl" aria-hidden="true">{a.icon}</span>
+                    <PanoButton src={a.pano} fallback={a.image} title={a.title} className="absolute right-3 top-3" />
+                  </div>
                 )}
                 <div className="p-5">
                   <h2 className="flex items-center gap-2 font-semibold"><span aria-hidden="true">{a.icon}</span>{a.title}</h2>

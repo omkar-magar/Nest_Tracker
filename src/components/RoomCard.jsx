@@ -1,8 +1,10 @@
 import { memo } from 'react'
 import Img from './Img'
+import PanoButton from './PanoButton'
 import { Badge, Button } from './ui'
 import { availability, priceLabel } from '../services/catalog'
 import { rupees } from '../services/format'
+import { roomPano } from '../lib/pano'
 
 // Start downloading the (lazy) booking page as soon as someone points at the button
 const prefetchBook = () => import('../pages/Book')
@@ -32,7 +34,10 @@ function RoomCard({ room, categoryName }) {
 
   return (
     <article className="flex flex-col overflow-hidden rounded-2xl border border-navy/10 bg-white">
-      <Img src={room.image} alt={`Room ${room.no}, ${room.wing ? `${room.wing} wing, ` : ''}${room.type}`} className="h-44 w-full object-cover" />
+      <div className="relative">
+        <Img src={room.image} alt={`Room ${room.no}, ${room.wing ? `${room.wing} wing, ` : ''}${room.type}`} className="h-44 w-full object-cover" />
+        <PanoButton src={roomPano(room.id)} fallback={room.image} title={`Room ${room.no}`} className="absolute right-3 top-3" />
+      </div>
       <div className="flex flex-1 flex-col p-4">
         <div className="flex items-start justify-between gap-2">
           <div>

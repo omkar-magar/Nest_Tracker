@@ -16,6 +16,7 @@ export const heroImages = [
 ]
 
 // image: photo of the real facility (public/images/...). Leave it out for a facility without a photo yet.
+// 360 photo (optional): public/images/360/<title in lower case, dashes for spaces>.jpg, e.g. gaming-zone.jpg, chill-cafe-area.jpg.
 export const amenities = [
   { icon: '🛏️', title: 'AC & Non-AC rooms', text: 'Pick the room that suits your budget. Both are furnished and cleaned regularly.', image: '/images/rooms/pg-101.webp' },
   { icon: '🎮', title: 'Gaming zone', text: 'A common gaming area to unwind with your housemates.', image: '/images/hero/gaming.webp' },

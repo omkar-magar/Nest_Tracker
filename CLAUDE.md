@@ -16,7 +16,7 @@ This repo used to hold the Nest_Tracker stay-management app (FastAPI backend + T
 | `src/index.css` | Tailwind import + brand colours in `@theme` |
 | `src/pages/manage/` | PG-management console at `/admin` (owner, manager, sales): beds, tenants, billing, expenses, complaints, enquiries, sales, employees, reports, settings; shared UI in `src/components/manage/`, data calls in `src/services/manage.js`. See docs/pg-management.md |
 | `supabase/migrations/2026112100000*` | PG-management schema, RLS and RPCs (roles, properties, billing, complaints, sales, payroll, reports, scheduled jobs) |
-| `public/images/` | `hero/`, `background/`, `rooms/<room-id>.webp`, `categories/<id>.jpg` (empty), `360/<room-id>.jpg` (empty, for `@photo-sphere-viewer/core`), `logo.png` |
+| `public/images/` | `hero/`, `background/`, `rooms/<room-id>.webp`, `categories/<id>.jpg` (empty), `360/<room-id>.jpg` (`chill-cafe-area.jpg` added; shown with `pannellum`), `logo.png` |
 
 ## Commands
 ```bash
