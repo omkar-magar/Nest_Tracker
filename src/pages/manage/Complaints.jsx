@@ -29,7 +29,7 @@ function Tickets() {
   const { property } = useScope()
   const [params, setParams] = useSearchParams()
   const [status, setStatus] = useState('open')
-  const [logging, setLogging] = useState(false)
+  const [logging, setLogging] = useState(() => params.get('new') === '1') // dashboard's "Raise maintenance"
   return (
     <Load loader={m.loadComplaints}>
       {(all, reload) => {

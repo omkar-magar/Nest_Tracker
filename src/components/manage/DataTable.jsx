@@ -4,8 +4,8 @@ import { exportCSV, exportExcel, exportPDF } from '../../services/exporters'
 
 // Searchable, sortable table with CSV / Excel / PDF export of exactly the rows shown.
 // columns: [{ key, label, render?(row), value?(row) (sort + export), noExport, className }]
-export default function DataTable({ rows, columns, title = 'Export', search = true, filters, onRowClick, empty = 'Nothing here yet', pageSize = 50, exportable = true }) {
-  const [q, setQ] = useState('')
+export default function DataTable({ rows, columns, title = 'Export', search = true, filters, onRowClick, empty = 'Nothing here yet', pageSize = 50, exportable = true, initialQuery = '' }) {
+  const [q, setQ] = useState(initialQuery)
   const [sort, setSort] = useState(null)
   const [limit, setLimit] = useState(pageSize)
   const val = (row, c) => (c.value ? c.value(row) : row[c.key])

@@ -12,7 +12,8 @@ const stayOf = (t) => t.bookings.find((b) => ['active', 'pending'].includes(b.st
 export default function Tenants() {
   const { property } = useScope()
   const [params, setParams] = useSearchParams()
-  const [filter, setFilter] = useState('current')
+  // a search from the header looks through everyone, not only who is staying now
+  const [filter, setFilter] = useState(() => (params.get('q') ? 'all' : 'current'))
   const navigate = useNavigate()
   const registering = params.get('new') === '1'
 
@@ -33,7 +34,7 @@ export default function Tenants() {
           || (filter === 'approval' && r.approval === 'pending') || (filter === 'police' && !['verified', 'not_required'].includes(r.police) && r.stay))
         return (
           <>
-            <DataTable title="Tenants" rows={shown} onRowClick={(r) => navigate(`/admin/tenants/${r.id}`)}
+            <DataTable key={params.get('q') ?? ''} initialQuery={params.get('q') ?? ''} title="Tenants" rows={shown} onRowClick={(r) => navigate(`/admin/tenants/${r.id}`)}
               filters={(
                 <>
                   <label className="text-sm"><span className="sr-only">Show</span>

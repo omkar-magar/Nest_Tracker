@@ -1,5 +1,6 @@
-import { Suspense, useEffect } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { Suspense, useEffect, useState } from 'react'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import Icon from '../../components/manage/Icon'
 import { useAuth } from '../../context/AuthContext'
 import useAsync from '../../hooks/useAsync'
 import NotificationBell from '../../components/NotificationBell'
@@ -41,6 +42,22 @@ function PropertySwitch() {
   )
 }
 
+// Header search: opens Tenants filtered by name, phone or room
+function TenantSearch() {
+  const navigate = useNavigate()
+  const [q, setQ] = useState('')
+  return (
+    <form role="search" className="relative w-full sm:w-64" onSubmit={(e) => { e.preventDefault(); if (q.trim()) navigate(`/admin/tenants?q=${encodeURIComponent(q.trim())}`) }}>
+      <label htmlFor="tenant-search" className="sr-only">Search tenants, rooms</label>
+      <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+      <input id="tenant-search" type="search" placeholder="Search tenants, rooms…" value={q} onChange={(e) => setQ(e.target.value)}
+        className={`${inputCls} !rounded-full !py-1.5 !pl-9`} />
+    </form>
+  )
+}
+
+const initials = (name) => (name ?? '').trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('') || '?'
+
 export default function ManageLayout() {
   const { role, profile, user, signOut } = useAuth()
   const props = useAsync(() => Promise.all([loadProperties(), loadStartProperty(user?.id)]), [user?.id])
@@ -56,12 +73,17 @@ export default function ManageLayout() {
     <ScopeProvider properties={props.data?.[0] ?? []} initial={props.data?.[1] ?? ''}>
       <div className="mx-auto w-full max-w-7xl px-4 py-5 text-navy">
         <header className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold">{TITLES[role] ?? 'Dashboard'}</h1>
-            <p className="text-sm text-slate-600">{profile?.full_name}</p>
+          <div className="flex items-center gap-3">
+            <span aria-hidden="true" className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-navy text-sm font-bold text-white">{initials(profile?.full_name)}</span>
+            <div>
+              <h1 className="text-2xl font-bold">{TITLES[role] ?? 'Dashboard'}</h1>
+              <p className="text-sm text-slate-600">{profile?.full_name}</p>
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <PropertySwitch />
+            {(role === 'admin' || role === 'manager') && <TenantSearch />}
+            {role === 'manager' && <Button to="/staff/manager" variant="outline">My day</Button>}
             <NotificationBell />
             <Button variant="outline" onClick={signOut}>Log out</Button>
           </div>

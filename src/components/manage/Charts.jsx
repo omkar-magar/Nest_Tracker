@@ -26,7 +26,7 @@ function Legend({ series }) {
 }
 
 // data: [{ label, ...values }], series: [{ key, label }]
-export function BarChart({ data, series, title, height = 220, money = true }) {
+export function BarChart({ data, series, title, height = 220, money = true, action }) {
   const [hover, setHover] = useState(null)
   const W = 640; const H = height; const pad = { l: 44, r: 8, t: 10, b: 28 }
   const all = data.flatMap((d) => series.map((s) => Number(d[s.key] || 0)))
@@ -37,7 +37,7 @@ export function BarChart({ data, series, title, height = 220, money = true }) {
   const barW = Math.max(3, Math.min(28, (groupW - 6) / series.length - 2))
   return (
     <figure className="rounded-2xl border border-navy/10 bg-white p-4">
-      <figcaption className="mb-1 text-sm font-semibold">{title}</figcaption>
+      <figcaption className="mb-1 flex flex-wrap items-center justify-between gap-2 text-sm font-semibold">{title}{action}</figcaption>
       <Legend series={series} />
       <div className="relative">
         <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label={`${title} chart. The same numbers are in the table below.`}>
