@@ -424,3 +424,7 @@ enabled = true
 # Razorpay calls this without a Supabase login; it is protected by the X-Razorpay-Signature check instead.
 [functions.razorpay-webhook]
 verify_jwt = false
+
+# Called by a scheduler without a Supabase login; protected by the x-cron-secret header instead.
+[functions.run-jobs]
+verify_jwt = false

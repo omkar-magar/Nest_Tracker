@@ -1,4 +1,4 @@
-// Customer asks to pay a bill. Creates a Razorpay order for the bill's amount and a payments row
+// Customer asks to pay a bill. Creates a Razorpay order for what is still owed (or a smaller part payment) and a payments row
 // (status 'created'). Nothing is marked paid here; that only happens in apply_payment_result().
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { cors, json } from '../_shared/razorpay.ts'
@@ -21,21 +21,24 @@ Deno.serve(async (req) => {
   const user = userData.user
   if (!user) return json({ error: 'Not signed in' }, 401)
 
-  const { billId } = await req.json().catch(() => ({}))
+  const { billId, amount: wanted } = await req.json().catch(() => ({}))
   if (!billId) return json({ error: 'billId is required' }, 400)
 
-  // The amount always comes from the database, never from the browser.
+  // What is owed always comes from the database. The browser may only ask to pay less (a part payment).
   const { data: bill } = await admin.from('bills')
-    .select('id, amount, status').eq('id', billId).eq('customer_id', user.id).maybeSingle()
+    .select('id, amount, amount_paid, status').eq('id', billId).eq('customer_id', user.id).maybeSingle()
   if (!bill) return json({ error: 'Bill not found' }, 404)
   if (bill.status !== 'unpaid') return json({ error: 'This bill is not payable' }, 400)
+  const owed = bill.amount - bill.amount_paid
+  const amount = wanted == null ? owed : Math.floor(Number(wanted))
+  if (!Number.isFinite(amount) || amount < 1 || amount > owed) return json({ error: `Enter an amount between 1 and ${owed}` }, 400)
 
   const paymentId = crypto.randomUUID()
   const res = await fetch('https://api.razorpay.com/v1/orders', {
     method: 'POST',
     headers: { Authorization: 'Basic ' + btoa(`${keyId}:${keySecret}`), 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      amount: bill.amount * 100, // rupees -> paise
+      amount: amount * 100, // rupees -> paise
       currency: 'INR',
       receipt: paymentId,
       notes: { payment_id: paymentId, bill_id: bill.id },
@@ -48,14 +51,14 @@ Deno.serve(async (req) => {
   }
 
   const { error } = await admin.from('payments').insert({
-    id: paymentId, bill_id: bill.id, customer_id: user.id, amount: bill.amount,
+    id: paymentId, bill_id: bill.id, customer_id: user.id, amount,
     provider: 'razorpay', is_simulated: false, provider_order_id: order.id,
   })
   if (error) return json({ error: error.message }, 500)
 
   const { data: profile } = await admin.from('profiles').select('full_name, phone').eq('id', user.id).maybeSingle()
   return json({
-    paymentId, orderId: order.id, keyId, amount: bill.amount,
+    paymentId, orderId: order.id, keyId, amount,
     prefill: { name: profile?.full_name || undefined, email: user.email, contact: profile?.phone || undefined },
   })
 })
