@@ -14,6 +14,8 @@ This repo used to hold the Nest_Tracker stay-management app (FastAPI backend + T
 | `src/components/NearbyMap.jsx` | animated SVG map; routes keyed by place `icon`, CSS inlined in the file |
 | `src/components/Img.jsx` | lazy `<img>` with fallback: given src, then same name as `.jpg`, then a gradient placeholder |
 | `src/index.css` | Tailwind import + brand colours in `@theme` |
+| `src/pages/manage/` | PG-management console at `/admin` (owner, manager, sales): beds, tenants, billing, expenses, complaints, enquiries, sales, employees, reports, settings; shared UI in `src/components/manage/`, data calls in `src/services/manage.js`. See docs/pg-management.md |
+| `supabase/migrations/2026112100000*` | PG-management schema, RLS and RPCs (roles, properties, billing, complaints, sales, payroll, reports, scheduled jobs) |
 | `public/images/` | `hero/`, `background/`, `rooms/<room-id>.webp`, `categories/<id>.jpg` (empty), `360/<room-id>.jpg` (empty, for `@photo-sphere-viewer/core`), `logo.png` |
 
 ## Commands
@@ -23,6 +25,7 @@ npm run dev       # http://localhost:5174
 npm run build     # outputs dist/
 npm run preview
 npm test           # Vitest + Testing Library; all tests live in tests/
+npm run test:db    # SQL tests: every migration in an in-process Postgres (PGlite), tests/db/
 ```
 Tests are in `tests/` only (`*.test.js(x)`; mocks in `tests/helpers/`, Supabase and auth are mocked, no network or `.env` needed). Add a test there when you add or change behaviour. No linter or formatter is set up; don't add them unless asked. This machine has little free RAM: don't set a large `NODE_OPTIONS` heap.
 
