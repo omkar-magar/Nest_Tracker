@@ -29,7 +29,7 @@ describe('migration plan', () => {
     expect(names[0]).toBe('server/db/prelude.sql')
     const sb = names.filter((n) => n.startsWith('supabase/'))
     expect(sb).toEqual([...sb].sort())
-    expect(sb).toHaveLength(13) // 5 original + 8 PG-management files (both storage files are skipped)
+    expect(sb).toHaveLength(16) // 5 original + 11 PG-management files (both storage files are skipped)
     expect(names.indexOf(sb.at(-1))).toBeLessThan(names.indexOf('server/db/migrations/001_availability_notify.sql'))
     expect(names.slice(-2)).toEqual([
       'server/db/migrations/001_availability_notify.sql',

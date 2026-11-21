@@ -112,6 +112,7 @@ describe('Login', () => {
     ['employee', 'employee', '/staff'],
     ['employee', 'admin', '/staff'],
     ['admin', 'admin', '/admin'],
+    ['admin', 'manager', '/admin/register'],
   ])('%s login: a signed-in %s goes straight to %s', (audience, role, dest) => {
     asRole(role)
     at(audience)

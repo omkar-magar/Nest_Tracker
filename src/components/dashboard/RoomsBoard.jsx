@@ -10,6 +10,18 @@ const roomState = (beds) => {
   return taken === beds.length ? { text: 'Fully occupied', tone: 'red' } : { text: 'Partially occupied', tone: 'amber' }
 }
 
+// A room let as a whole (rent_basis 'room') counts as rented; any other room with someone in it is a PG room.
+// People = occupied beds, so the numbers move as soon as a bed is taken or freed.
+export function roomUse(rooms) {
+  const used = rooms.map((r) => ({ r, people: r.beds.filter((b) => b.is_occupied).length })).filter((x) => x.people)
+  const pg = used.filter((x) => x.r.rent_basis !== 'room')
+  const rented = used.filter((x) => x.r.rent_basis === 'room')
+  return {
+    pgRooms: pg.length, pgPeople: pg.reduce((s, x) => s + x.people, 0),
+    rentedRooms: rented.length, rentedPeople: rented.reduce((s, x) => s + x.people, 0),
+  }
+}
+
 export function bedCounts(rooms) {
   const beds = rooms.flatMap((r) => r.beds)
   return {
@@ -45,11 +57,16 @@ export default function RoomsBoard({ canManage = false }) {
   const rooms = data.map((r) => ({ ...r, beds: [...r.beds].sort((a, b) => a.label.localeCompare(b.label)) }))
   const shown = rooms.filter((r) => filter === 'all' || roomState(r.beds).tone === filter)
   const c = bedCounts(rooms)
+  const u = roomUse(rooms)
+  const n = (k, one, many) => `${k} ${k === 1 ? one : many}`
 
   return (
     <div>
       <p className="text-sm text-slate-600" aria-live="polite">
         {c.rooms} rooms · {c.beds} beds · {c.available} free · {c.occupied} occupied · {c.maintenance} under maintenance. Updates live.
+      </p>
+      <p className="mt-1 text-sm font-medium" aria-live="polite">
+        PG: {n(u.pgRooms, 'room', 'rooms')}, {n(u.pgPeople, 'person', 'people')} · Rented: {n(u.rentedRooms, 'room', 'rooms')}, {n(u.rentedPeople, 'person', 'people')}
       </p>
       <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Filter rooms">
         {[['all', 'All'], ['green', 'Available'], ['amber', 'Partially occupied'], ['red', 'Fully occupied']].map(([k, label]) => (
@@ -61,12 +78,16 @@ export default function RoomsBoard({ canManage = false }) {
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {shown.map((r) => {
           const s = roomState(r.beds)
+          const taken = r.beds.filter((b) => b.is_occupied).length
           return (
             <Card key={r.id}>
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold">Room {r.room_no} <span className="text-xs font-normal text-slate-500">{r.wing ? `${r.wing} wing · ` : ''}F{r.floor} · {r.ac_type}</span></h3>
                 <Badge tone={s.tone}>{s.text}</Badge>
               </div>
+              <p className="mt-1 text-xs text-slate-600">
+                {taken ? `${r.rent_basis === 'room' ? 'Rented' : 'PG'} · ${taken} of ${r.beds.length} ${r.beds.length === 1 ? 'bed' : 'beds'} taken` : `${r.beds.length} ${r.beds.length === 1 ? 'bed' : 'beds'}, all free`}
+              </p>
               <ul className="mt-3 flex flex-wrap gap-2">
                 {r.beds.map((b) => {
                   const state = b.is_occupied ? 'Occupied' : b.status === 'maintenance' ? 'Maintenance' : 'Free'

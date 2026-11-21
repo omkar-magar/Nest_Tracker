@@ -11,6 +11,7 @@ import { loadProperties, loadStartProperty, runJobs } from '../../services/manag
 export const MODULES = [
   ['', 'Dashboard', ['admin', 'manager']],
   ['beds', 'Beds', ['admin', 'manager', 'sales']],
+  ['register', 'Guest register', ['admin', 'manager']],
   ['tenants', 'Tenants', ['admin', 'manager']],
   ['billing', 'Rent & payments', ['admin', 'manager']],
   ['expenses', 'Expenses', ['admin', 'manager']],
@@ -48,7 +49,9 @@ export default function ManageLayout() {
   // gives them a nudge. The database skips the run if it happened in the last 30 minutes.
   useEffect(() => { if (role === 'admin' || role === 'manager') runJobs().catch(() => {}) }, [role])
 
+  // managers work from the guest register, so it leads their menu
   const nav = MODULES.filter(([, , roles]) => roles.includes(role))
+    .sort((x, y) => (role === 'manager' ? (y[0] === 'register') - (x[0] === 'register') : 0))
   return (
     <ScopeProvider properties={props.data?.[0] ?? []} initial={props.data?.[1] ?? ''}>
       <div className="mx-auto w-full max-w-7xl px-4 py-5 text-navy">

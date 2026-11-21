@@ -5,3 +5,4 @@ dist/
 !.env.example
 /Agent.md
 /.agents/skills/
+/register-backups/

@@ -25,6 +25,8 @@ export default function Login({ audience = 'customer' }) {
 
   const next = params.get('next')
   const allowed = cfg.roles.includes(role)
+  // managers land on the guest register in the console
+  const after = audience === 'admin' && role === 'manager' ? '/admin/register' : cfg.after
   const [otp, setOtp] = useState(false)
   // ?property=P1 shows that property's name and address: a branded login link per property (PRD 2.1)
   const propertyId = params.get('property')
@@ -34,8 +36,8 @@ export default function Login({ audience = 'customer' }) {
 
   // Already signed in with the right role (for example the PWA reopening): go straight in.
   useEffect(() => {
-    if (user && allowed) navigate(next && next.startsWith('/') ? next : cfg.after, { replace: true })
-  }, [user, allowed, next, cfg.after, navigate])
+    if (user && allowed) navigate(next && next.startsWith('/') ? next : after, { replace: true })
+  }, [user, allowed, next, after, navigate])
 
   if (!configured) {
     return <div className="mx-auto max-w-md px-4 py-16"><Notice tone="warn">Accounts are not available until Supabase is configured. See docs/setup.md.</Notice></div>
@@ -52,7 +54,7 @@ export default function Login({ audience = 'customer' }) {
   }
 
   const wrongRole = user && role && !allowed
-  if (user && role && allowed) return <Navigate to={cfg.after} replace />
+  if (user && role && allowed) return <Navigate to={after} replace />
 
   return (
     <div className="mx-auto w-full max-w-md px-4 py-12 text-navy">
