@@ -33,20 +33,34 @@ beforeAll(async () => {
 describe('property and beds', () => {
   it('gives every bed a readable unique id', async () => {
     const beds = await bedsOf('pg-101')
-    expect(beds.map((b) => b.code)).toEqual(['P1-F1-R101-B1', 'P1-F1-R101-B2'])
+    expect(beds.map((b) => b.code)).toEqual(['P1-A-F1-R101-B1', 'P1-A-F1-R101-B2'])
   })
 
   it('bulk-creates rooms with beds for a manager of that property only', async () => {
     const n = await as(db, manager, ({ one }) =>
       one("select public.bulk_create_rooms('P1', 6, 601, 3, 2, 'monthly-pg', 'double', 'AC', 7000) n"))
     expect(n.n).toBe(3)
-    expect((await bedsOf('p1-602')).length).toBe(2)
+    expect((await bedsOf('p1-a-602')).length).toBe(2)
     await expect(as(db, otherManager, ({ q }) =>
       q("select public.bulk_create_rooms('P1', 7, 701, 1, 1, 'monthly-pg', 'single', 'AC', 7000)"))).rejects.toThrow(/do not manage/)
   })
 
+  it('lets both wings use the same room numbers, with distinct bed codes', async () => {
+    await as(db, manager, ({ q }) =>
+      q("select public.bulk_create_rooms('P1', 6, 601, 1, 2, 'monthly-pg', 'double', 'AC', 7000, 0, 'month', 'B')"))
+    const room = await db.query("select wing, room_no from public.rooms where id = 'p1-b-601'")
+    expect(room.rows[0]).toEqual({ wing: 'B', room_no: '601' })
+    expect((await bedsOf('p1-b-601')).map((b) => b.code)).toEqual(['P1-B-F6-R601-B1', 'P1-B-F6-R601-B2'])
+    await expect(as(db, manager, ({ q }) =>
+      q("select public.bulk_create_rooms('P1', 6, 601, 1, 1, 'monthly-pg', 'single', 'AC', 7000, 0, 'month', 'B')"))).rejects.toThrow(/already exists/)
+    // moving a room to the other wing rebuilds its bed codes
+    await db.query("update public.rooms set wing = 'B' where id = 'pg-102'")
+    expect((await bedsOf('pg-102'))[0].code).toBe('P1-B-F1-R102-B1')
+    await db.query("update public.rooms set wing = 'A' where id = 'pg-102'")
+  })
+
   it('reserves a bed, blocks others, and shows it as reserved', async () => {
-    const [b1] = await bedsOf('p1-603')
+    const [b1] = await bedsOf('p1-a-603')
     await as(db, manager, ({ q }) =>
       q("select public.reserve_bed($1, 'Walk-in Ravi', '9800000001', 2000, current_date + 3, $2)", [b1.id, tenant]))
     const st = await db.query('select public.bed_state(b) s from public.beds b where id = $1', [b1.id])
@@ -65,13 +79,13 @@ describe('check-in and monthly invoices', () => {
   let booking, bill
   it('refuses check-in without an emergency contact', async () => {
     const lone = await makeUser(db, 'customer', 'NoContact')
-    const [b] = await bedsOf('p1-601')
+    const [b] = await bedsOf('p1-a-601')
     await expect(as(db, manager, ({ q }) =>
       q('select public.check_in_tenant($1)', [{ customer_id: lone, bed_ids: [b.id] }]))).rejects.toThrow(/emergency contact/)
   })
 
   it('checks in, converts the reservation, takes the deposit and bills the first period', async () => {
-    const [b1] = await bedsOf('p1-603')
+    const [b1] = await bedsOf('p1-a-603')
     const row = await as(db, manager, ({ one }) => one('select public.check_in_tenant($1) id', [{
       customer_id: tenant, bed_ids: [b1.id], check_in: monthStart(), rent: 7000, deposit: 7000,
       deposit_paid: true, deposit_mode: 'cash', notice_period_days: 30,
@@ -90,7 +104,7 @@ describe('check-in and monthly invoices', () => {
   })
 
   it('pro-rates a mid-month check-in', async () => {
-    const [b] = await bedsOf('p1-602')
+    const [b] = await bedsOf('p1-a-602')
     const d = new Date(monthStart()); d.setUTCDate(16)
     const start = d.toISOString().slice(0, 10)
     const row = await as(db, manager, ({ one }) => one('select public.check_in_tenant($1) id', [{
@@ -132,14 +146,14 @@ describe('check-in and monthly invoices', () => {
   it('splits sub-meter electricity across the room\'s occupants', async () => {
     const t3 = await makeUser(db, 'customer', 'Third')
     await as(db, t3, ({ q }) => q('select public.save_my_tenant_profile($1)', [emergency]))
-    const [, b2] = await bedsOf('p1-603')
+    const [, b2] = await bedsOf('p1-a-603')
     await as(db, manager, ({ q }) => q('select public.check_in_tenant($1)', [{ customer_id: t3, bed_ids: [b2.id], check_in: monthStart(), rent: 7000, deposit: 0 }]))
     const shares = await as(db, manager, ({ one }) =>
-      one("select public.add_electricity('p1-603', current_date, 'meter', null, 100, 201, 8) s"))
+      one("select public.add_electricity('p1-a-603', current_date, 'meter', null, 100, 201, 8) s"))
     expect(shares.s.map((x) => x.amount)).toEqual([404, 404])   // 101 units x 8 = 808
     const lines = await db.query("select count(*)::int n from public.bill_lines where kind = 'electricity'")
     expect(lines.rows[0].n).toBe(2)
-    await expect(as(db, manager, ({ q }) => q("select public.add_electricity('p1-603', current_date - 40, 'meter', null, 300, 200, 8)")))
+    await expect(as(db, manager, ({ q }) => q("select public.add_electricity('p1-a-603', current_date - 40, 'meter', null, 300, 200, 8)")))
       .rejects.toThrow(/lower/)
   })
 
@@ -172,7 +186,7 @@ describe('check-in and monthly invoices', () => {
   })
 
   it('transfers to another bed with rent history kept', async () => {
-    const [nb] = await bedsOf('p1-601')
+    const [nb] = await bedsOf('p1-a-601')
     await as(db, manager, ({ q }) => q("select public.transfer_stay($1, $2, current_date, 7500, 'Wants window bed')", [booking, [nb.id]]))
     const t = await db.query('select old_rate, new_rate from public.stay_transfers where booking_id = $1', [booking])
     expect(t.rows[0]).toEqual({ old_rate: 7000, new_rate: 7500 })

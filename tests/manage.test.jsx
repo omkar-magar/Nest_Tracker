@@ -143,14 +143,14 @@ describe('bed map', () => {
   it('colour-codes beds and opens a bed for allocation or reservation', async () => {
     asRole('admin')
     db.tables.rooms = { data: [{ id: 'r1', property_id: 'P1', room_no: '101', floor: 1, room_type: 'double', ac_type: 'AC', is_active: true, price: 7000, deposit: 7000, billing_period: 'month',
-      beds: [{ id: 'b1', code: 'P1-F1-R101-B1', label: 'A', status: 'available', is_active: true }, { id: 'b2', code: 'P1-F1-R101-B2', label: 'B', status: 'available', is_occupied: true, is_active: true }] }] }
+      beds: [{ id: 'b1', code: 'P1-A-F1-R101-B1', label: 'A', status: 'available', is_active: true }, { id: 'b2', code: 'P1-A-F1-R101-B2', label: 'B', status: 'available', is_occupied: true, is_active: true }] }] }
     db.tables.reservations = { data: [] }
     db.tables.booking_beds = { data: [{ bed_id: 'b2', bookings: { customer_id: 'c1', rate: 7000, check_in: '2026-11-01', profiles: { full_name: 'Ravi' } } }] }
     render(<MemoryRouter><Beds /></MemoryRouter>)
-    expect(await screen.findByRole('button', { name: /Bed P1-F1-R101-B2: Occupied, Ravi/ })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /Bed P1-A-F1-R101-B2: Occupied, Ravi/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Vacant: 1' })).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: /Bed P1-F1-R101-B1: Vacant/ }))
-    const dialog = screen.getByRole('dialog', { name: 'Bed P1-F1-R101-B1' })
+    await userEvent.click(screen.getByRole('button', { name: /Bed P1-A-F1-R101-B1: Vacant/ }))
+    const dialog = screen.getByRole('dialog', { name: 'Bed P1-A-F1-R101-B1' })
     expect(within(dialog).getByRole('button', { name: 'Allocate / check in' })).toBeInTheDocument()
     await userEvent.click(within(dialog).getByRole('button', { name: 'Reserve' }))
     expect(within(dialog).getByLabelText(/Hold until/)).toBeInTheDocument()
