@@ -29,7 +29,7 @@ import PanoButton from '../src/components/PanoButton'
 import RoomCard from '../src/components/RoomCard'
 import Hero from '../src/components/Hero'
 import PanoViewer, { LOAD_TIMEOUT_MS } from '../src/components/PanoViewer'
-import { clampPitch, project } from '../src/components/SoftPano'
+import { clampPitch, drawView, viewTable } from '../src/components/SoftPano'
 import { amenityPano, clearPanoChecks, roomPano } from '../src/lib/pano'
 import { loadAmenities } from '../src/services/catalog'
 
@@ -202,26 +202,33 @@ describe('360 buttons on the page', () => {
 })
 
 describe('canvas 360 projection', () => {
-  // 8 x 4 photo where every pixel holds its own index, so the result says where each pixel came from
+  // 8 x 4 photo; each column has its own red value (column x 20), so a pixel's red says where it came from
   const W = 8, H = 4
-  const src = Uint32Array.from({ length: W * H }, (_, i) => i)
-  const centre = (view, cw = 3, ch = 3) => {
-    const out = new Uint32Array(cw * ch)
-    project(src, W, H, out, cw, ch, view)
-    return out[Math.floor(ch / 2) * cw + Math.floor(cw / 2)]
+  const src = Uint32Array.from({ length: W * H }, (_, i) => (0xff000000 | ((i % W) * 20)) >>> 0)
+  const centreRed = (yaw, pitch = 0) => {
+    const t = viewTable(W, H, 3, 3, pitch, 90)
+    const out = new Uint32Array(9)
+    drawView(src, W, H, t, yaw, out)
+    return out[4] & 255
   }
 
-  it('looking straight ahead shows the middle of the photo; turning right moves along it', () => {
-    expect(centre({ yaw: 0, pitch: 0, hfov: 90 })).toBe(2 * W + 4) // row 2, column 4
-    expect(centre({ yaw: 90, pitch: 0, hfov: 90 })).toBe(2 * W + 6) // a quarter turn right
-    expect(centre({ yaw: -90, pitch: 0, hfov: 90 })).toBe(2 * W + 2)
+  it('looking straight ahead shows the middle of the photo, blended between neighbouring pixels', () => {
+    const t = viewTable(W, H, 3, 3, 0, 90)
+    expect(t.u[4]).toBeCloseTo(W / 2 - 0.5) // halfway between columns 3 and 4
+    expect(t.v[4]).toBeCloseTo(H / 2 - 0.5)
+    expect(centreRed(0)).toBe(70) // (60 + 80) / 2: smooth, not a jagged nearest-pixel pick
+  })
+
+  it('turning right moves along the photo and wraps around the seam', () => {
+    expect(centreRed(90)).toBe(110) // columns 5 and 6
+    expect(centreRed(-90)).toBe(30) // columns 1 and 2
+    expect(centreRed(180)).toBe(70) // column 7 (140) blended with column 0 (0) across the seam
   })
 
   it('looking up shows the top of the photo, and the left of the view is the left of the photo', () => {
-    expect(Math.floor(centre({ yaw: 0, pitch: 60, hfov: 90 }) / W)).toBe(0)
-    const out = new Uint32Array(3 * 3)
-    project(src, W, H, out, 3, 3, { yaw: 0, pitch: 0, hfov: 120 })
-    expect(out[3] % W).toBeLessThan(out[5] % W)
+    expect(viewTable(W, H, 3, 3, 60, 90).v[4]).toBeLessThan(1)
+    const t = viewTable(W, H, 3, 3, 0, 120)
+    expect(t.u[3]).toBeLessThan(t.u[5])
   })
 
   it('keeps the view inside the allowed pitch range', () => {

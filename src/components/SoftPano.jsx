@@ -6,19 +6,23 @@ const MIN_PITCH = -45 // the floor under the camera is distorted
 const MAX_PITCH = 60
 const MIN_HFOV = 50
 const MAX_HFOV = 120
-const MAX_RENDER_WIDTH = 720 // drawn at most this wide and scaled up
-const MIN_RENDER_WIDTH = 320
-const SLOW_FRAME_MS = 35 // a frame slower than this lowers the drawing width, so slow machines stay smooth
+const MAX_RENDER_WIDTH = 1920 // canvas pixels: the view is drawn at the screen's own resolution up to this
+const DETAIL = 2 // ...and never at more than this many canvas pixels per photo pixel, which would add no detail
+const MIN_RENDER_WIDTH = 480
+const MAX_PHOTO_WIDTH = 8192 // larger photos are scaled down on load to keep memory sane
+const SLOW_FRAME_MS = 30 // when the sharp frames average slower than this, the resolution steps down
+const SETTLE_MS = 150 // after dragging up/down or zooming stops, the view is redrawn sharp
 const IDLE_MS = 4000 // the spin starts again this long after the visitor lets go
 const SPIN_DEG_PER_S = 2
 const RAD = Math.PI / 180
 
-// Fill `out` (cw x ch pixels) with the view at yaw/pitch/hfov (degrees) taken from `src` (W x H, 2:1)
-export function project(src, W, H, out, cw, ch, { yaw, pitch, hfov }) {
+// Where each canvas pixel looks in the photo, for a given pitch and zoom (yaw 0).
+// Turning left/right only slides along the photo, so the costly trig runs once per pitch/zoom, not per frame.
+export function viewTable(W, H, cw, ch, pitch, hfov) {
   const f = cw / 2 / Math.tan((hfov * RAD) / 2)
-  const cy = Math.cos(yaw * RAD), sy = Math.sin(yaw * RAD)
   const cp = Math.cos(pitch * RAD), sp = Math.sin(pitch * RAD)
   const ku = W / (2 * Math.PI), kv = H / Math.PI
+  const u = new Float32Array(cw * ch), v = new Float32Array(cw * ch)
   let i = 0
   for (let y = 0; y < ch; y++) {
     const vy = ch / 2 - y - 0.5
@@ -26,14 +30,34 @@ export function project(src, W, H, out, cw, ch, { yaw, pitch, hfov }) {
     const zp = f * cp - vy * sp
     for (let x = 0; x < cw; x++) {
       const vx = x - cw / 2 + 0.5
-      const x2 = vx * cy + zp * sy
-      const z2 = zp * cy - vx * sy
-      let u = Math.floor((Math.atan2(x2, z2) + Math.PI) * ku)
-      let v = Math.floor((Math.PI / 2 - Math.atan2(yp, Math.sqrt(x2 * x2 + z2 * z2))) * kv)
-      if (u >= W) u = W - 1
-      if (v >= H) v = H - 1
-      out[i++] = src[v * W + u]
+      // photo pixel centres sit at +0.5, so shift by half a pixel for the bilinear lookup
+      u[i] = (Math.atan2(vx, zp) + Math.PI) * ku - 0.5
+      v[i] = (Math.PI / 2 - Math.atan2(yp, Math.sqrt(vx * vx + zp * zp))) * kv - 0.5
+      i++
     }
+  }
+  return { u, v, cw, ch, pitch, hfov }
+}
+
+// Fill `out` with the view at `yaw` degrees, blending the four nearest photo pixels (no jagged edges)
+export function drawView(src, W, H, table, yaw, out) {
+  const { u, v } = table
+  const shift = ((((yaw / 360) * W) % W) + W) % W
+  for (let i = 0, n = u.length; i < n; i++) {
+    let x = u[i] + shift
+    if (x >= W) x -= W
+    else if (x < 0) x += W
+    const x0 = x | 0, fx = x - x0, x1 = x0 + 1 === W ? 0 : x0 + 1
+    let y = v[i]
+    if (y < 0) y = 0
+    else if (y > H - 1) y = H - 1
+    const y0 = y | 0, fy = y - y0, r0 = y0 * W, r1 = (y0 + 1 < H ? y0 + 1 : y0) * W
+    const a = src[r0 + x0], b = src[r0 + x1], c = src[r1 + x0], d = src[r1 + x1]
+    const w00 = (1 - fx) * (1 - fy), w10 = fx * (1 - fy), w01 = (1 - fx) * fy, w11 = fx * fy
+    const R = (a & 255) * w00 + (b & 255) * w10 + (c & 255) * w01 + (d & 255) * w11
+    const G = ((a >> 8) & 255) * w00 + ((b >> 8) & 255) * w10 + ((c >> 8) & 255) * w01 + ((d >> 8) & 255) * w11
+    const B = ((a >> 16) & 255) * w00 + ((b >> 16) & 255) * w10 + ((c >> 16) & 255) * w01 + ((d >> 16) & 255) * w11
+    out[i] = 0xff000000 | (((B + 0.5) | 0) << 16) | (((G + 0.5) | 0) << 8) | ((R + 0.5) | 0)
   }
 }
 
@@ -58,20 +82,22 @@ export default function SoftPano({ src, caption, onFail }) {
 
     const view = { yaw: 0, pitch: -5, hfov: 100 }
     const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-    let pano = null, frame = null, out = null, dirty = true, touched = -Infinity, drag = null
+    let pano = null, dirty = true, touched = -Infinity, drag = null
     let last = performance.now(), raf = 0, maxWidth = MAX_RENDER_WIDTH, drawn = 0, avg = 0
+    let lastPitch = NaN, lastHfov = NaN, changedAt = -Infinity
 
     const img = new Image()
     img.onload = () => {
       try {
+        const s = Math.min(1, MAX_PHOTO_WIDTH / img.naturalWidth)
         const c = document.createElement('canvas')
-        c.width = img.naturalWidth
-        c.height = img.naturalHeight
+        c.width = Math.round(img.naturalWidth * s)
+        c.height = Math.round(img.naturalHeight * s)
         const g = c.getContext('2d')
-        g.drawImage(img, 0, 0)
+        g.drawImage(img, 0, 0, c.width, c.height)
         const d = g.getImageData(0, 0, c.width, c.height)
         pano = { px: new Uint32Array(d.data.buffer), W: c.width, H: c.height }
-        dirty = true
+        size()
       } catch (err) {
         fail.current(err)
       }
@@ -79,40 +105,78 @@ export default function SoftPano({ src, caption, onFail }) {
     img.onerror = () => fail.current('360 photo did not load')
     img.src = src
 
+    // 'full': the screen's own resolution (sharp). 'low': half that, only while dragging up/down or zooming.
+    const sizes = {}, frames = {}, tables = {}
+    let shown = null
     const size = () => {
       const w = el.clientWidth, h = el.clientHeight
       if (!w || !h) return
-      const s = Math.min(1, maxWidth / w)
-      cv.width = Math.max(1, Math.round(w * s))
-      cv.height = Math.max(1, Math.round(h * s))
-      frame = ctx.createImageData(cv.width, cv.height)
-      out = new Uint32Array(frame.data.buffer)
+      const photoPx = pano ? (view.hfov / 360) * pano.W * DETAIL : Infinity
+      const s = Math.min(window.devicePixelRatio || 1, 2, maxWidth / w, photoPx / w)
+      const fw = Math.max(1, Math.round(w * s)), fh = Math.max(1, Math.round(h * s))
+      sizes.full = [fw, fh]
+      sizes.low = [Math.max(1, fw >> 1), Math.max(1, fh >> 1)]
+      tables.full = tables.low = null
+      shown = null
       dirty = true
     }
     size()
     const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(size)
     ro?.observe(el)
 
+    // draws one frame at quality q; returns true when the pitch/zoom table had to be rebuilt
+    const draw = (q) => {
+      const [w, h] = sizes[q]
+      if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h }
+      let fr = frames[q]
+      if (!fr || fr.img.width !== w || fr.img.height !== h) {
+        const im = ctx.createImageData(w, h)
+        fr = frames[q] = { img: im, px: new Uint32Array(im.data.buffer) }
+      }
+      let t = tables[q], rebuilt = false
+      if (!t || t.cw !== w || t.ch !== h || t.pitch !== view.pitch || t.hfov !== view.hfov) {
+        t = tables[q] = viewTable(pano.W, pano.H, w, h, view.pitch, view.hfov)
+        rebuilt = true
+      }
+      drawView(pano.px, pano.W, pano.H, t, view.yaw, fr.px)
+      ctx.putImageData(fr.img, 0, 0)
+      shown = q
+      return rebuilt
+    }
+
     const nextFrame = window.requestAnimationFrame?.bind(window) ?? ((fn) => setTimeout(() => fn(performance.now()), 16))
     const cancelFrame = window.cancelAnimationFrame?.bind(window) ?? clearTimeout
     const tick = (now) => {
       const dt = Math.min(0.1, (now - last) / 1000)
       last = now
-      if (pano && !drag && !reduceMotion && now - touched > IDLE_MS) { view.yaw -= SPIN_DEG_PER_S * dt; dirty = true }
-      if (dirty && pano && out) {
-        const t0 = performance.now()
-        view.pitch = clampPitch(view.pitch, view.hfov, cv.width / cv.height)
-        project(pano.px, pano.W, pano.H, out, cv.width, cv.height, view)
-        ctx.putImageData(frame, 0, 0)
-        dirty = false
-        // running average, ignoring the first frames while the JS engine warms up
-        drawn++
-        avg = avg * 0.8 + (performance.now() - t0) * 0.2
-        if (drawn > 8 && avg > SLOW_FRAME_MS && cv.width > MIN_RENDER_WIDTH) {
-          maxWidth = Math.max(MIN_RENDER_WIDTH, Math.round(cv.width * 0.8))
-          drawn = 0
-          avg = 0
-          size()
+      if (pano && sizes.full) {
+        if (!drag && !reduceMotion && now - touched > IDLE_MS) { view.yaw -= SPIN_DEG_PER_S * dt; dirty = true }
+        view.pitch = clampPitch(view.pitch, view.hfov, sizes.full[0] / sizes.full[1])
+        if (view.pitch !== lastPitch || view.hfov !== lastHfov) {
+          if (shown) changedAt = now
+          if (view.hfov !== lastHfov) size()
+          lastPitch = view.pitch
+          lastHfov = view.hfov
+          dirty = true
+        }
+        const q = now - changedAt < SETTLE_MS ? 'low' : 'full'
+        if (q !== shown) dirty = true
+        if (dirty) {
+          const t0 = performance.now()
+          const rebuilt = draw(q)
+          dirty = false
+          // sharp frames on a slow machine: step the resolution down (ignore the first, JIT warm-up frames)
+          if (q === 'full' && !rebuilt) {
+            drawn++
+            avg = avg * 0.8 + (performance.now() - t0) * 0.2
+            if (drawn > 8 && avg > SLOW_FRAME_MS && sizes.full[0] > MIN_RENDER_WIDTH) {
+              // cost grows with the pixel count, so aim straight for a width that meets the budget
+              maxWidth = Math.max(MIN_RENDER_WIDTH, Math.round(sizes.full[0] * Math.sqrt(SLOW_FRAME_MS / avg) * 0.9))
+              drawn = 0
+              avg = 0
+              size()
+            }
+          }
         }
       }
       raf = nextFrame(tick)
