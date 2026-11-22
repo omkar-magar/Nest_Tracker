@@ -4,12 +4,27 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="manifest" href="/manifest.webmanifest" />
-    <meta name="theme-color" content="#fbfaf6" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-title" content="YOLO Nest" />
-    <link rel="apple-touch-icon" href="/icons/public-192.png" />
+    <!-- iOS Safari reads the manifest from the first page load and ignores later changes, so pick the app
+         (admin / staff / public) here, before React starts. Keep in sync with src/hooks/usePwaIdentity.js. -->
+    <script id="pwa-identity">
+      (function () {
+        var p = location.pathname
+        var id = p.indexOf('/admin') === 0 ? ['/manifest-admin.webmanifest', 'YOLO Admin', '#1c1f4a', '/icons/admin-192.png']
+          : p.indexOf('/staff') === 0 ? ['/manifest-staff.webmanifest', 'YOLO Staff', '#1c1f4a', '/icons/staff-192.png']
+          : ['/manifest.webmanifest', 'YOLO Nest', '#fbfaf6', '/icons/public-192.png']
+        function add(tag, attrs) {
+          var el = document.createElement(tag)
+          for (var k in attrs) el.setAttribute(k, attrs[k])
+          document.head.appendChild(el)
+        }
+        add('link', { rel: 'manifest', href: id[0] })
+        add('meta', { name: 'apple-mobile-web-app-title', content: id[1] })
+        add('meta', { name: 'theme-color', content: id[2] })
+        add('link', { rel: 'apple-touch-icon', href: id[3] })
+      })()
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
