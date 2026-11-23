@@ -207,7 +207,7 @@ export default function Dashboard() {
       </div>
 
       <Load loader={() => loadAdminDashboard(property, period)} deps={[property, period]}>
-        {({ d, reg, trend, breakdown, rent, bills, activities }) => {
+        {({ d, reg, regPaidByWing, trend, breakdown, rent, bills, activities }) => {
           if (!d) return <Notice>No data yet. Add a property and rooms to get started.</Notice>
           const b = d.beds ?? {}; const m = d.money ?? {}; const c = d.complaints ?? {}
           // r: the guest register, where the PG's current guests and their rent status are kept
@@ -226,6 +226,11 @@ export default function Dashboard() {
           const rentAlert = regDue + rent.overdueTenants
           const alerts = [rentAlert, leaving, utilities, c.open ?? 0]
 
+          // this month: app payments + rent marked paid in the register
+          const wingRevenue = (w) => Number(w.revenue ?? 0) + (regPaidByWing[w.id] ?? 0)
+          const regRent = Number(cur?.register_rent ?? 0)
+          // share of the register's monthly rent marked paid; the app's own figure when the wing has no register rent
+          const collection = (w) => (Number(w.reg?.rent_roll) > 0 ? Math.round((Number(w.reg.rent_paid ?? 0) / Number(w.reg.rent_roll)) * 100) : w.collection_efficiency)
           const compare = (
             <>
               <H3>{property ? 'Compare wings' : 'Wing by wing'}</H3>
@@ -236,12 +241,12 @@ export default function Dashboard() {
                 { key: 'rooms', label: 'Rooms occupied', render: (r) => `${r.reg.rooms_occupied ?? 0}/${r.reg.rooms_total ?? 0} (${r.reg.occupancy_pct ?? 0}%)`, value: (r) => Number(r.reg.occupancy_pct ?? 0) },
                 { key: 'mix', label: 'PG · rented · empty', render: (r) => `${r.reg.pg_rooms ?? 0} · ${r.reg.rented_rooms ?? 0} · ${r.reg.empty_rooms ?? 0}`, value: (r) => Number(r.reg.empty_rooms ?? 0) },
                 { key: 'rent_roll', label: 'Monthly rent', render: (r) => rupees(r.reg.rent_roll), value: (r) => Number(r.reg.rent_roll ?? 0) },
-                { key: 'revenue', label: 'Revenue', render: (r) => rupees(r.revenue), value: (r) => Number(r.revenue) },
-                { key: 'expenses', label: 'Expenses', render: (r) => rupees(r.expenses), value: (r) => Number(r.expenses) },
-                { key: 'profit', label: 'Profit', render: (r) => rupees(r.profit), value: (r) => Number(r.profit) },
+                { key: 'revenue', label: 'Revenue', render: (r) => rupees(wingRevenue(r)), value: (r) => wingRevenue(r) },
+                { key: 'expenses', label: 'Expenses', render: (r) => rupees(r.expenses), value: (r) => Number(r.expenses ?? 0) },
+                { key: 'profit', label: 'Profit', render: (r) => rupees(wingRevenue(r) - Number(r.expenses ?? 0)), value: (r) => wingRevenue(r) - Number(r.expenses ?? 0) },
                 { key: 'pending', label: 'Pending rent', render: (r) => rupees(Number(r.pending ?? 0) + Number(r.reg.rent_pending ?? 0)), value: (r) => Number(r.pending ?? 0) + Number(r.reg.rent_pending ?? 0) },
                 { key: 'complaints_open', label: 'Open complaints', render: (r) => `${r.complaints_open}${r.complaints_overdue ? ` (${r.complaints_overdue} overdue)` : ''}`, value: (r) => r.complaints_open },
-                { key: 'collection_efficiency', label: 'Collection', render: (r) => (r.collection_efficiency == null ? '—' : `${r.collection_efficiency}%`), value: (r) => Number(r.collection_efficiency ?? 0) },
+                { key: 'collection_efficiency', label: 'Collection', render: (r) => (collection(r) == null ? '—' : `${collection(r)}%`), value: (r) => Number(collection(r) ?? 0) },
               ]} />
             </>
           )
@@ -250,7 +255,8 @@ export default function Dashboard() {
             <>
               <section aria-label="Key figures" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <Kpi tone={1} icon="rupee" label="Total revenue" value={rupees(revenue)} change={pctChange(revenue, Number(prev?.revenue ?? 0))}
-                  spark={upto.map((t) => Number(t.revenue))} periodLabel={periodLabel} />
+                  spark={upto.map((t) => Number(t.revenue))} periodLabel={periodLabel}
+                  hint={regRent ? `${periodLabel} · ${rupees(regRent)} marked paid in register` : undefined} />
                 <Kpi tone={5} icon="receipt" label="Total expenses" value={rupees(spent)} upIsGood={false} change={pctChange(spent, Number(prev?.expenses ?? 0))}
                   spark={upto.map((t) => Number(t.expenses))} periodLabel={periodLabel} />
                 <Kpi tone={3} icon="trend" label="Net income" value={rupees(net)} change={pctChange(net, prev ? Number(prev.revenue) - Number(prev.expenses) : 0)}

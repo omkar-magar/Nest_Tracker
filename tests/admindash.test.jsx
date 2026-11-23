@@ -56,6 +56,14 @@ describe('dashboard helpers', () => {
     expect(dash.ago(list[0].at)).toBe('2 hours ago')
     expect(dash.ago(day(-1))).toBe('Yesterday')
   })
+  it('adds rent marked paid in the register to each month’s revenue', () => {
+    const t = dash.withRegisterRent(
+      [{ month: '2026-10-01', revenue: 1000, expenses: 500 }, { month: '2026-11-01', revenue: 1500, expenses: 0 }],
+      [{ month: '2026-09-01', amount: 0 }, { month: '2026-10-01', amount: 0 }, { month: '2026-11-01', amount: 528239 }])
+    expect(t.map((x) => [x.month, x.revenue, x.expenses, x.register_rent])).toEqual([
+      ['2026-09-01', 0, 0, 0], ['2026-10-01', 1000, 500, 0], ['2026-11-01', 529739, 0, 528239]])
+    expect(dash.withRegisterRent([{ month: '2026-11-01', revenue: 5 }], [])).toEqual([{ month: '2026-11-01', revenue: 5, register_rent: 0 }])
+  })
   it('turns register changes into activity lines', () => {
     const list = dash.recentActivities({ payments: [], checkins: [], checkouts: [], complaints: [], register: [
       { op: 'INSERT', name: 'Asha', room: 'A-101', at: hoursAgo(3) },
@@ -157,6 +165,16 @@ describe('admin dashboard page', () => {
     expect(within(actions).getByRole('link', { name: 'Add tenant' })).toHaveAttribute('href', '/admin/tenants?new=1')
     expect(screen.getByRole('heading', { name: 'Wing by wing' })).toBeInTheDocument()
     expect(within(actions).getByRole('link', { name: 'Add guest' })).toHaveAttribute('href', '/admin/register')
+  })
+  it('counts rent marked paid in the register as revenue', async () => {
+    db.rpcs.register_rent_paid = { data: { months: [{ month: '2026-10-01', amount: 0 }, { month: '2026-11-01', amount: 20000 }], properties: [{ id: 'P1', amount: 20000 }] }, error: null }
+    open()
+    const kpi = within(await screen.findByRole('region', { name: 'Key figures' }))
+    // revenue ₹1,85,000 + ₹20,000; net = ₹2,05,000 − ₹62,000
+    expect(kpi.getByText('₹2,05,000')).toBeInTheDocument()
+    expect(kpi.getByText('₹1,43,000')).toBeInTheDocument()
+    expect(screen.getByText('₹1,43,000', { selector: 'td' })).toBeInTheDocument()
+    expect(supabase.rpc).toHaveBeenCalledWith('register_rent_paid', { p_property: null, p_months: 6 })
   })
   it('puts register guests in the wing table and the check-out list', async () => {
     open()

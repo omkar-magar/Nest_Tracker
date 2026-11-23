@@ -98,15 +98,29 @@ export function rentDue(outstanding) {
   return { tenants: tenants.size, overdueTenants: late.size }
 }
 
-const inProperty = (pid, col = 'property_id') => (q) => (pid ? q.eq(col, pid) : q)
+// Monthly trend (report_trends: app payments and expenses) with the rent marked paid in the guest register
+// added to each month's revenue; `register_rent` keeps that part. Months only the register has are added too.
+export function withRegisterRent(trend, months) {
+  const key = (m) => String(m).slice(0, 7)
+  const reg = Object.fromEntries(months.map((x) => [key(x.month), Number(x.amount) || 0]))
+  const byMonth = new Map(trend.map((t) => [key(t.month), { ...t }]))
+  for (const x of months) if (!byMonth.has(key(x.month))) byMonth.set(key(x.month), { month: x.month, revenue: 0, expenses: 0 })
+  return [...byMonth.keys()].sort().map((k) => {
+    const t = byMonth.get(k); const r = reg[k] ?? 0
+    return { ...t, revenue: Number(t.revenue ?? 0) + r, register_rent: r }
+  })
+}
+
+const inProperty =(pid, col = 'property_id') => (q) => (pid ? q.eq(col, pid) : q)
 
 // period: 0 = this month, -1 = last month. Pending rent, beds and alerts are always "now".
 export async function loadAdminDashboard(pid, period = 0) {
   const { from, to } = monthRange(period)
   const today = ymd(new Date())
-  const [d, reg, trend, expenses, outstanding, recurring, payslips, payments, checkins, checkouts, complaints] = await Promise.all([
+  const [d, reg, regPaid, trend, expenses, outstanding, recurring, payslips, payments, checkins, checkouts, complaints] = await Promise.all([
     ownerDashboard(pid),
     registerSummary(pid),
+    rpc('register_rent_paid', { p_property: pid || null, p_months: 6 }),
     rpc('report_trends', { p_property: pid || null, p_months: 6 }),
     rpc('report_expenses', { p_from: from, p_to: to, p_property: pid || null }),
     rpc('report_outstanding', { p_property: pid || null }),
@@ -124,7 +138,8 @@ export async function loadAdminDashboard(pid, period = 0) {
       (q) => inProperty(pid)(q.order('created_at', { ascending: false }).limit(5))),
   ])
   return {
-    d, reg: reg ?? EMPTY_SUMMARY, trend: trend ?? [], breakdown: expenseBreakdown(expenses ?? []), rent: rentDue(outstanding ?? []),
+    d, reg: reg ?? EMPTY_SUMMARY, trend: withRegisterRent(trend ?? [], regPaid?.months ?? []),
+    regPaidByWing: Object.fromEntries((regPaid?.properties ?? []).map((p) => [p.id, Number(p.amount)])), breakdown: expenseBreakdown(expenses ?? []), rent: rentDue(outstanding ?? []),
     bills: upcomingBills(recurring ?? [], payslips ?? []),
     activities: recentActivities({ payments: payments ?? [], checkins: checkins ?? [], checkouts: checkouts ?? [], complaints: complaints ?? [], register: reg?.recent ?? [] }),
   }

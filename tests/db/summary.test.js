@@ -68,6 +68,27 @@ describe('register summary', () => {
     expect(recent.filter((r) => r.name === 'Amit').map((r) => r.op)).toEqual(['PAID', 'INSERT'])
   })
 
+  it('counts rent marked paid in the month it was marked, once per guest', async () => {
+    const paid = (who = owner, pid = null) => as(db, who, ({ one }) => one('select public.register_rent_paid($1, 6) r', [pid])).then((r) => r.r)
+    // Rahul was added paid (6,000); Amit was marked paid in the test above (6,000)
+    let r = await paid()
+    expect(r.months).toHaveLength(6)
+    expect(Number(r.months.at(-1).amount)).toBe(12000)
+    expect(r.properties).toEqual([{ id: 'P1', amount: 12000 }])
+    // paid -> pending -> paid again in the same month still counts once
+    const amit = (await db.query("select id from public.register_guests where name = 'Amit'")).rows[0].id
+    await as(db, owner, ({ q }) => q("update public.register_guests set rent_status = 'pending' where id = $1", [amit]))
+    await as(db, owner, ({ q }) => q("update public.register_guests set rent_status = 'paid' where id = $1", [amit]))
+    // a past guest imported as already checked out is not this month's money
+    await as(db, owner, ({ q }) => q('select public.register_apply($1, $2, true)',
+      ['P1', JSON.stringify([{ op: 'add', set: { room_no: aRooms[2], name: 'Old', rent: 9000, rent_status: 'paid', checked_out_on: '2026-01-31' } }])]))
+    r = await paid()
+    expect(Number(r.months.at(-1).amount)).toBe(12000)
+    expect((await paid(owner, 'P2')).properties).toEqual([])
+    expect((await paid(manager)).properties).toEqual([{ id: 'P1', amount: 12000 }])
+    await expect(paid(caretaker)).rejects.toThrow(/owner and managers/)
+  })
+
   it('shows a manager only their wings and keeps other staff out', async () => {
     const s = await summary(manager)
     expect(s.properties.map((p) => p.id)).toEqual(['P1'])
