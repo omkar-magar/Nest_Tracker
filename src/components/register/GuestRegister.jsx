@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import useAsync from '../../hooks/useAsync'
-import { ActionMsg, Tabs, useAction } from '../manage/kit'
+import { ActionMsg, Modal, Tabs, useAction } from '../manage/kit'
 import { Badge, Button, Card, Empty, ErrorBox, Notice, Stat, TableSkeleton, inputCls } from '../ui'
 import * as r from '../../services/register'
 import { download, exportExcel, exportPDF } from '../../services/exporters'
@@ -116,6 +116,10 @@ function Current({ pid, list, setList, rooms, roomNos, canEdit, reload }) {
   const [soon, setSoon] = useState(false)
   const [adding, setAdding] = useState(null)
   const [leaving, setLeaving] = useState(null)
+  const [details, setDetails] = useState(null)
+  // stable, so saving a field (which re-renders this list) doesn't pull focus back to the popup
+  const closeDetails = useCallback(() => setDetails(null), [])
+  const detailGuest = details !== null ? list.find((x) => x.id === details) : null
   const [view, setViewState] = useState(() => { try { return localStorage.getItem('yolo.register.view') || 'table' } catch { return 'table' } })
   const setView = (v) => { setViewState(v); try { localStorage.setItem('yolo.register.view', v) } catch { /* private mode */ } }
   const a = useAction()
@@ -154,7 +158,7 @@ function Current({ pid, list, setList, rooms, roomNos, canEdit, reload }) {
 
       <div className="mt-4 flex flex-wrap gap-2">
         {canEdit && <Button variant="sun" onClick={() => setAdding({})}>+ Add guest</Button>}
-        {canEdit && <Button variant="outline" aria-pressed={edit} onClick={() => setEdit(!edit)}>{edit ? 'Edit mode: on (saves as you type)' : 'Edit mode: off'}</Button>}
+        {canEdit && view === 'rooms' && <Button variant="outline" aria-pressed={edit} onClick={() => setEdit(!edit)}>{edit ? 'Edit mode: on (saves as you type)' : 'Edit mode: off'}</Button>}
         <Button variant="outline" onClick={() => exportExcel('Guest register', exportRows, EXPORT_COLS(kindOf))}>Export Excel</Button>
         <Button variant="outline" onClick={() => a.run(() => exportPDF('Guest register', exportRows, EXPORT_COLS(kindOf),
           `${sum.people} guests · ${sum.occupiedRooms}/${sum.totalRooms} rooms occupied · PG ${sum.pgRooms} rooms (${sum.pgPeople} people) · rented ${sum.rentedRooms}`))}>Export PDF</Button>
@@ -197,7 +201,7 @@ function Current({ pid, list, setList, rooms, roomNos, canEdit, reload }) {
       {sum.totalRooms === 0 ? (
         <div className="mt-6"><Empty title="No rooms or guests yet">{canEdit ? 'Add the rooms under Properties & rooms, or import the old register under Import and AI link.' : 'Nothing has been added yet.'}</Empty></div>
       ) : view === 'table' ? (
-        <GuestTable rooms={shownRooms.filter((x) => x.shown.length || kindF === 'empty')} edit={canEdit && edit} canEdit={canEdit} roomNos={roomNos} onSaved={saved} onCheckout={setLeaving} />
+        <GuestTable rooms={shownRooms.filter((x) => x.shown.length || kindF === 'empty')} onDetails={setDetails} />
       ) : floors.map((f) => (
         <section key={f} className="mt-6">
           <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-600">{floorName(f)}</h3>
@@ -226,6 +230,8 @@ function Current({ pid, list, setList, rooms, roomNos, canEdit, reload }) {
       ))}
 
       {adding && <AddGuestModal pid={pid} roomNos={roomNos} room={adding.room} after={adding.after} onClose={() => setAdding(null)} onDone={() => { setAdding(null); reload() }} />}
+      {detailGuest && !leaving && <GuestDetails g={detailGuest} canEdit={canEdit} roomNos={roomNos} onSaved={saved} onClose={closeDetails}
+        onCheckout={setLeaving} />}
       {leaving && <CheckoutModal guest={leaving} onClose={() => setLeaving(null)} onDone={() => { setList((l) => l.filter((x) => x.id !== leaving.id)); setLeaving(null) }} />}
     </div>
   )
@@ -274,39 +280,59 @@ function GuestItem({ g, edit, canEdit, roomNos, onSaved, onCheckout }) {
 }
 
 // Every guest as one compact row (room, type, name, contact, rent status, dates); a room's number and type span
-// its guests' rows. "Details" opens the rest under the row: every field, editable for owner / manager, and Check out.
-// Edit mode opens every row. Empty rooms only show when filtered for.
-const TH = ['Sr', 'Room', 'Type', 'Guest', 'Contact', 'Rent status', 'Check-in', 'Expected check-out']
+// its guests' rows. "Details" opens a popup with every field (editable for owner / manager) and Check out.
+// On phones only room, name and rent status show. Empty rooms only show when filtered for.
+const COLS = [['Sr'], ['Room', true], ['Type'], ['Guest', true], ['Contact'], ['Rent status', true], ['Check-in'], ['Expected check-out']]
 const td = 'px-3 py-2 align-top'
-// the Details column stays in view when the table scrolls sideways (phones)
+const wide = 'hidden sm:table-cell' // columns left out on phones
 const STICKY = 'sticky right-0 whitespace-nowrap shadow-[-6px_0_6px_-6px_rgba(0,0,0,0.15)]'
 const shortKind = (room) => (room.kind === 'pg' ? `PG · ${room.people}` : room.kind === 'rented' ? 'Rented' : 'Empty')
 const money = (v) => (v === null || v === undefined ? '—' : rupees(v))
 const STATUS_OPTS = r.STATUSES.map((s) => [s, r.STATUS_TEXT[s]])
 
-function GuestTable({ rooms, edit, canEdit, roomNos, onSaved, onCheckout }) {
-  const [open, setOpen] = useState(() => new Set())
-  const toggle = (id) => setOpen((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
-  const isOpen = (g) => edit || open.has(g.id)
+function GuestTable({ rooms, onDetails }) {
   let sr = 0
   if (!rooms.length) return <div className="mt-6"><Empty title="No guests match" /></div>
   return (
     <div className="mt-6 overflow-x-auto rounded-2xl border border-navy/10 bg-white">
-      <table className="w-full min-w-[50rem] text-left text-sm">
+      <table className="w-full text-left text-sm sm:min-w-[50rem]">
         <caption className="sr-only">Guest register</caption>
         <thead className="border-b border-navy/10 bg-cream text-xs uppercase tracking-wide text-slate-500">
-          <tr>{TH.map((h) => <th key={h} scope="col" className="whitespace-nowrap px-3 py-2.5 font-semibold">{h}</th>)}<th scope="col" className={`${STICKY} bg-cream px-3 py-2.5`}><span className="sr-only">Details</span></th></tr>
+          <tr>
+            {COLS.map(([h, phone]) => <th key={h} scope="col" className={`whitespace-nowrap px-3 py-2.5 font-semibold ${phone ? '' : wide}`}>{h}</th>)}
+            <th scope="col" className={`${STICKY} bg-cream px-3 py-2.5`}><span className="sr-only">Details</span></th>
+          </tr>
         </thead>
         {rooms.map((room) => {
           const rows = room.shown.length ? room.shown : [null]
-          // the room and type cells also span the open detail rows
-          const span = rows.length + rows.filter((g) => g && isOpen(g)).length
           return (
             <tbody key={room.room_no} className="border-b border-navy/10 last:border-0">
               {rows.map((g, i) => (
-                <GuestRows key={g?.id ?? 'empty'} g={g} sr={g ? ++sr : ''} first={i === 0} room={room} span={span}
-                  open={g ? isOpen(g) : false} onToggle={() => toggle(g.id)} edit={edit}
-                  canEdit={canEdit} roomNos={roomNos} onSaved={onSaved} onCheckout={onCheckout} />
+                <tr key={g?.id ?? 'empty'} className="border-t border-navy/5 first:border-0">
+                  <td className={`${td} ${wide} text-slate-500`}>{g ? ++sr : ''}</td>
+                  {i === 0 && (
+                    <>
+                      <th scope="rowgroup" rowSpan={rows.length} className={`${td} whitespace-nowrap font-semibold`}>{room.room_no}</th>
+                      <td rowSpan={rows.length} className={`${td} ${wide} whitespace-nowrap`}><Badge tone={KIND_TONE[room.kind]}>{shortKind(room)}</Badge></td>
+                    </>
+                  )}
+                  {!g ? <td colSpan={COLS.length - 2} className={`${td} italic text-slate-500`}>No guest</td> : (
+                    <>
+                      <td className={`${td} font-medium`}>
+                        {g.name || <span className="italic text-slate-500">Unnamed entry</span>}
+                        {r.leavingSoon(g) && <span className="mt-1 block"><Badge tone="amber">Leaving soon</Badge></span>}
+                      </td>
+                      <td className={`${td} ${wide} whitespace-nowrap`}>{g.contact ? <a href={`tel:${g.contact}`} className="underline focus-visible:outline-2 focus-visible:outline-navy">{g.contact}</a> : '—'}</td>
+                      <td className={`${td} whitespace-nowrap`}><StatusPill value={g.rent_status} /></td>
+                      <td className={`${td} ${wide} whitespace-nowrap`}>{g.check_in ? formatDate(g.check_in) : '—'}</td>
+                      <td className={`${td} ${wide} whitespace-nowrap`}>{g.expected_checkout ? formatDate(g.expected_checkout) : '—'}</td>
+                      <td className={`${td} ${STICKY} bg-white`}>
+                        <button type="button" aria-haspopup="dialog" aria-label={`Details, ${g.name || 'unnamed entry'}`} onClick={() => onDetails(g.id)}
+                          className="rounded-full border border-navy/30 px-3 py-1 text-xs font-semibold text-navy hover:bg-navy/5 focus-visible:outline-2 focus-visible:outline-navy">Details</button>
+                      </td>
+                    </>
+                  )}
+                </tr>
               ))}
             </tbody>
           )
@@ -316,79 +342,45 @@ function GuestTable({ rooms, edit, canEdit, roomNos, onSaved, onCheckout }) {
   )
 }
 
-function GuestRows({ g, sr, first, room, span, open, onToggle, edit, canEdit, roomNos, onSaved, onCheckout }) {
-  const roomCells = first && (
-    <>
-      <th scope="rowgroup" rowSpan={span} className={`${td} whitespace-nowrap font-semibold`}>{room.room_no}</th>
-      <td rowSpan={span} className={`${td} whitespace-nowrap`}><Badge tone={KIND_TONE[room.kind]}>{shortKind(room)}</Badge></td>
-    </>
-  )
-  if (!g) {
-    return (
-      <tr className="border-t border-navy/5 first:border-0">
-        <td className={td} />{roomCells}
-        <td colSpan={TH.length - 2} className={`${td} italic text-slate-500`}>No guest</td>
-      </tr>
-    )
-  }
-  const detailsId = `g${g.id}-details`
-  const who = g.name || 'unnamed entry'
+// Popup with one guest's full entry. Owner / manager edit in place (each field saves when you leave it).
+function GuestDetails({ g, canEdit, roomNos, onSaved, onCheckout, onClose }) {
+  const date = (v) => (v ? formatDate(v) : '—')
   return (
-    <>
-      <tr className={`border-t border-navy/5 first:border-0 ${open ? 'bg-cream/50' : ''}`}>
-        <td className={`${td} text-slate-500`}>{sr}</td>
-        {roomCells}
-        <td className={`${td} font-medium`}>
-          {g.name || <span className="italic text-slate-500">Unnamed entry</span>}
-          {r.leavingSoon(g) && <span className="mt-1 block"><Badge tone="amber">Leaving soon</Badge></span>}
-        </td>
-        <td className={`${td} whitespace-nowrap`}>{g.contact ? <a href={`tel:${g.contact}`} className="underline focus-visible:outline-2 focus-visible:outline-navy">{g.contact}</a> : '—'}</td>
-        <td className={`${td} whitespace-nowrap`}><StatusPill value={g.rent_status} /></td>
-        <td className={`${td} whitespace-nowrap`}>{g.check_in ? formatDate(g.check_in) : '—'}</td>
-        <td className={`${td} whitespace-nowrap`}>{g.expected_checkout ? formatDate(g.expected_checkout) : '—'}</td>
-        <td className={`${td} ${STICKY} ${open ? 'bg-cream' : 'bg-white'}`}>
-          {!edit && (
-            <button type="button" aria-expanded={open} aria-controls={detailsId} aria-label={`${open ? 'Hide' : 'Show'} details, ${who}`} onClick={onToggle}
-              className="rounded-full border border-navy/30 px-3 py-1 text-xs font-semibold text-navy hover:bg-navy/5 focus-visible:outline-2 focus-visible:outline-navy">
-              Details <span aria-hidden="true">{open ? '▴' : '▾'}</span>
-            </button>
-          )}
-        </td>
-      </tr>
-      {open && (
-        <tr id={detailsId} className="bg-cream/50">
-          <td className={td} />
-          <td colSpan={TH.length - 2} className={`${td} pb-4`}>
-            {canEdit ? (
-              <>
-                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                  <EditCell g={g} k="name" label="Guest name" onSaved={onSaved} />
-                  <EditCell g={g} k="contact" label="Contact" type="tel" onSaved={onSaved} />
-                  <EditCell g={g} k="room_no" label="Room" options={roomNos.length ? roomNos.map((n) => [n, n]) : null} onSaved={onSaved} />
-                  <EditCell g={g} k="rent" label="Rent (₹)" type="number" onSaved={onSaved} />
-                  <EditCell g={g} k="rent_status" label="Rent status" options={STATUS_OPTS} onSaved={onSaved} />
-                  <EditCell g={g} k="deposit" label="Deposit (₹)" type="number" onSaved={onSaved} />
-                  <EditCell g={g} k="deposit_status" label="Deposit status" options={STATUS_OPTS} onSaved={onSaved} />
-                  <EditCell g={g} k="check_in" label="Check-in" type="date" onSaved={onSaved} />
-                  <EditCell g={g} k="expected_checkout" label="Expected check-out" type="date" onSaved={onSaved} />
-                  <div className="sm:col-span-2 lg:col-span-3"><EditCell g={g} k="notes" label="Notes" onSaved={onSaved} /></div>
-                </div>
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-xs text-slate-600">Changes save as you leave each field.</p>
-                  <Button variant="danger" className="!px-3 !py-1 text-xs" onClick={() => onCheckout(g)}>{r.occupies(g) ? 'Check out' : 'Remove'}</Button>
-                </div>
-              </>
-            ) : (
-              <dl className="grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-4">
-                <div><dt className="text-xs text-slate-500">Rent</dt><dd>{money(g.rent)} <StatusPill value={g.rent_status} /></dd></div>
-                <div><dt className="text-xs text-slate-500">Deposit</dt><dd>{money(g.deposit)} <StatusPill value={g.deposit_status} /></dd></div>
-                <div className="col-span-2"><dt className="text-xs text-slate-500">Notes</dt><dd className="break-words">{g.notes || '—'}</dd></div>
-              </dl>
-            )}
-          </td>
-        </tr>
+    <Modal title={g.name ? `Guest details: ${g.name}` : 'Guest details'} onClose={onClose} wide>
+      {canEdit ? (
+        <>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <EditCell g={g} k="name" label="Guest name" onSaved={onSaved} />
+            <EditCell g={g} k="contact" label="Contact" type="tel" onSaved={onSaved} />
+            <EditCell g={g} k="room_no" label="Room" options={roomNos.length ? roomNos.map((n) => [n, n]) : null} onSaved={onSaved} />
+            <EditCell g={g} k="rent" label="Rent (₹)" type="number" onSaved={onSaved} />
+            <EditCell g={g} k="rent_status" label="Rent status" options={STATUS_OPTS} onSaved={onSaved} />
+            <EditCell g={g} k="deposit" label="Deposit (₹)" type="number" onSaved={onSaved} />
+            <EditCell g={g} k="deposit_status" label="Deposit status" options={STATUS_OPTS} onSaved={onSaved} />
+            <EditCell g={g} k="check_in" label="Check-in" type="date" onSaved={onSaved} />
+            <EditCell g={g} k="expected_checkout" label="Expected check-out" type="date" onSaved={onSaved} />
+            <EditCell g={g} k="notes" label="Notes" span onSaved={onSaved} />
+          </div>
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs text-slate-600">Changes save as you leave each field.</p>
+            <div className="flex gap-2">
+              <Button variant="danger" onClick={() => onCheckout(g)}>{r.occupies(g) ? 'Check out' : 'Remove'}</Button>
+              <Button variant="outline" onClick={onClose}>Done</Button>
+            </div>
+          </div>
+        </>
+      ) : (
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+          <div><dt className="text-xs text-slate-500">Room</dt><dd>{g.room_no}</dd></div>
+          <div><dt className="text-xs text-slate-500">Contact</dt><dd>{g.contact ? <a href={`tel:${g.contact}`} className="underline focus-visible:outline-2 focus-visible:outline-navy">{g.contact}</a> : '—'}</dd></div>
+          <div><dt className="text-xs text-slate-500">Rent</dt><dd>{money(g.rent)} <StatusPill value={g.rent_status} /></dd></div>
+          <div><dt className="text-xs text-slate-500">Deposit</dt><dd>{money(g.deposit)} <StatusPill value={g.deposit_status} /></dd></div>
+          <div><dt className="text-xs text-slate-500">Check-in</dt><dd>{date(g.check_in)}</dd></div>
+          <div><dt className="text-xs text-slate-500">Expected check-out</dt><dd>{date(g.expected_checkout)}</dd></div>
+          <div className="col-span-2"><dt className="text-xs text-slate-500">Notes</dt><dd className="break-words">{g.notes || '—'}</dd></div>
+        </dl>
       )}
-    </>
+    </Modal>
   )
 }
 
