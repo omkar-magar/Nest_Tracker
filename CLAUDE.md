@@ -46,4 +46,11 @@ Tests are in `tests/` only (`*.test.js(x)`; mocks in `tests/helpers/`, Supabase 
 - Author is the repo-local git user (`git config --local user.name`). **Never** add Claude as author or co-author, and no `Co-Authored-By` or "Generated with" lines.
 - Small, focused commits with short plain messages, e.g. `add rooms gallery`, `fix navbar on mobile`.
 - Never commit `node_modules/`, `dist/` or `.env` files.
-- Commit only when the developer asks.
+- Commit only when the developer asks, except for the deploy step below.
+
+## Deploying (standing approval)
+After finishing a change and getting tests + build green, go live without asking, so the developer sees it on their side:
+1. Apply any new migrations to hosted Supabase first: load `.env.local` (`set -a && . ./.env.local; set +a`), run `npx --yes supabase@3.2.0 db push --remote --dry-run`, check it lists only the new files, then the same command with `--yes`.
+2. Commit the change (rules above), push the working branch, then fast-forward `main` (`git push origin <branch>:main`); Vercel deploys production from `main`.
+3. Check the live site picked it up and tell the developer to hard-reload (Ctrl+Shift+R).
+Stop and ask instead if tests fail, the dry run shows unexpected migrations, `main` can't fast-forward, or a migration drops/rewrites data.
