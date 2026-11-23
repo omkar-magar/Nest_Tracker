@@ -5,7 +5,7 @@ import { FileButton, Load, Small, StatusBadge, Tabs, useAction, useScope } from 
 import DataTable from '../../components/manage/DataTable'
 import { Notice } from '../../components/ui'
 import * as m from '../../services/manage'
-import { label, monthStart } from '../../services/pg'
+import { label, monthStart, ymd } from '../../services/pg'
 import { formatDate, rupees } from '../../services/format'
 
 const MODES = ['cash', 'upi', 'bank_transfer', 'cheque', 'card', 'other']
@@ -50,7 +50,7 @@ function ExpenseList({ cats }) {
       <label className="mb-3 block text-sm">From <input type="date" className="rounded-xl border border-navy/20 px-2 py-1" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
       <CrudPanel table="expenses" title="Expenses" deps={[property, from]} select="*, expense_categories(name, grp)"
         query={(q) => { let x = q.gte('spent_on', from).order('spent_on', { ascending: false }); if (property) x = x.eq('property_id', property); return x }}
-        defaults={{ property_id: property || properties[0]?.id, spent_on: new Date().toISOString().slice(0, 10), payment_mode: 'cash' }}
+        defaults={{ property_id: property || properties[0]?.id, spent_on: ymd(), payment_mode: 'cash' }}
         canEdit
         columns={[
           { key: 'spent_on', label: 'Date', render: (r) => formatDate(r.spent_on), value: (r) => r.spent_on },
@@ -130,7 +130,7 @@ function OtherIncome() {
   const { property, properties } = useScope()
   return (
     <CrudPanel table="other_income" title="Other income" deps={[property]} query={(q) => (property ? q.eq('property_id', property) : q).order('received_on', { ascending: false })}
-      defaults={{ property_id: property || properties[0]?.id, received_on: new Date().toISOString().slice(0, 10) }}
+      defaults={{ property_id: property || properties[0]?.id, received_on: ymd() }}
       columns={[{ key: 'received_on', label: 'Date', render: (r) => formatDate(r.received_on) }, { key: 'property_id', label: 'Property' },
         { key: 'source', label: 'Source' }, { key: 'amount', label: 'Amount', render: (r) => rupees(r.amount) }, { key: 'notes', label: 'Notes' }]}
       fields={[

@@ -6,7 +6,7 @@ import DataTable from '../../components/manage/DataTable'
 import { ActionMsg, Fact, FileButton, FormFields, Load, Modal, Small, StatusBadge, Tabs, useAction, useScope } from '../../components/manage/kit'
 import { Button, Stat, inputCls } from '../../components/ui'
 import * as m from '../../services/manage'
-import { COMPLAINT_CATEGORIES, PRIORITIES, complaintCategory, complaintMoves, label } from '../../services/pg'
+import { COMPLAINT_CATEGORIES, PRIORITIES, complaintCategory, complaintMoves, label, ymd } from '../../services/pg'
 import { formatDate, formatDateTime, rupees } from '../../services/format'
 
 export default function Complaints() {
@@ -193,7 +193,7 @@ function Preventive() {
     <Load loader={() => m.rows('vendors', '*')}>
       {(vendors) => (
         <CrudPanel table="maintenance_schedules" title="Preventive maintenance" deps={[property]} query={(q) => (property ? q.eq('property_id', property) : q).order('next_due')}
-          defaults={{ property_id: property || properties[0]?.id, interval_days: 90, remind_days: 3, active: true, next_due: new Date().toISOString().slice(0, 10) }}
+          defaults={{ property_id: property || properties[0]?.id, interval_days: 90, remind_days: 3, active: true, next_due: ymd() }}
           columns={[
             { key: 'title', label: 'Task' }, { key: 'property_id', label: 'Property' }, { key: 'interval_days', label: 'Every (days)' },
             { key: 'next_due', label: 'Next due', render: (r) => formatDate(r.next_due) }, { key: 'remind_days', label: 'Remind days before' },
