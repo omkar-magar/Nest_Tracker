@@ -8,7 +8,7 @@ import { ymd } from './pg'
 export const STATUSES = ['paid', 'pending', 'partially_paid', 'not_updated', 'not_applicable']
 export const STATUS_TEXT = { paid: 'Paid', pending: 'Pending', partially_paid: 'Partially paid', not_updated: 'Not updated', not_applicable: 'Not applicable' }
 export const FIELDS = ['room_no', 'name', 'contact', 'rent', 'deposit', 'rent_status', 'deposit_status', 'check_in', 'expected_checkout', 'notes']
-const LIVE_COLS = 'id, property_id, room_no, sort_order, name, contact, rent, deposit, rent_status, deposit_status, check_in, expected_checkout, notes, updated_at'
+const LIVE_COLS = 'id, property_id, room_no, sort_order, name, contact, rent, deposit, rent_status, deposit_status, check_in, expected_checkout, notes, room_type, updated_at'
 
 // ---------------------------------------------------------------- data
 export async function loadRegisterProperties() {
@@ -105,6 +105,7 @@ export function toStatus(v) {
 export function clean(set) {
   const out = {}
   for (const [k, raw] of Object.entries(set)) {
+    if (k === 'room_type') { out[k] = raw === 'pg' ? 'pg' : 'rented'; continue }
     if (!FIELDS.includes(k) && k !== 'checked_out_on' && k !== 'checkout_note') continue
     if (NUMS.includes(k)) out[k] = money(raw)
     else if (DATES.includes(k)) out[k] = raw ? toDate(raw) : null
@@ -114,9 +115,9 @@ export function clean(set) {
   return out
 }
 
-// ---------------------------------------------------------------- rooms: PG or rented follows the head count
+// ---------------------------------------------------------------- rooms: 2+ guests make a PG room; a guest alone is PG or rented by their room_type
 export const occupies = (g) => Boolean(String(g.name ?? '').trim())
-export const roomKind = (people) => (people === 0 ? 'empty' : people === 1 ? 'rented' : 'pg')
+export const roomKind = (people, alone) => (people === 0 ? 'empty' : people === 1 && alone?.room_type !== 'pg' ? 'rented' : 'pg')
 export const KIND_TEXT = { empty: 'Empty', rented: 'Rented', pg: 'PG' }
 const byRoomNo = (a, b) => String(a).localeCompare(String(b), 'en', { numeric: true })
 export const floorOf = (roomNo) => { const n = parseInt(String(roomNo).split('-').pop(), 10); return Number.isFinite(n) && n >= 100 ? Math.floor(n / 100) : 0 }
@@ -128,7 +129,7 @@ export function roomSummary(guests, rooms = []) {
   const list = Object.keys(floor).sort(byRoomNo).map((room_no) => {
     const inRoom = guests.filter((g) => g.room_no === room_no)
     const people = inRoom.filter(occupies).length
-    return { room_no, floor: floor[room_no], guests: inRoom, people, kind: roomKind(people) }
+    return { room_no, floor: floor[room_no], guests: inRoom, people, kind: roomKind(people, inRoom.find(occupies)) }
   })
   const of = (k) => list.filter((r) => r.kind === k)
   return {

@@ -36,6 +36,13 @@ describe('room counts follow the head count', () => {
     expect(roomSummary([GUESTS[3]], ROOMS).rooms[1].kind).toBe('rented')
     expect(roomSummary([GUESTS[3], guest(9, '102', 'New')], ROOMS).rooms[1]).toMatchObject({ kind: 'pg', people: 2 })
   })
+  it('counts a guest alone as PG when marked so, but 2+ guests are PG whatever they are marked', () => {
+    expect(roomSummary([{ ...GUESTS[3], room_type: 'pg' }], ROOMS).rooms[1]).toMatchObject({ kind: 'pg', people: 1 })
+    expect(roomSummary([{ ...GUESTS[3], room_type: 'pg' }], ROOMS)).toMatchObject({ pgRooms: 1, pgPeople: 1, rentedRooms: 0 })
+    expect(roomSummary(GUESTS.map((g) => ({ ...g, room_type: 'rented' })), ROOMS).rooms[0].kind).toBe('pg')
+    expect(clean({ room_type: 'pg' })).toEqual({ room_type: 'pg' })
+    expect(clean({ room_type: 'x' })).toEqual({ room_type: 'rented' })
+  })
   it('does not count an unnamed placeholder as a person, and adds rooms only found in the register', () => {
     const s = roomSummary([guest(5, '103', ''), guest(6, '201', 'Someone')], ROOMS)
     expect(s.rooms.find((r) => r.room_no === '103').kind).toBe('empty')
@@ -211,6 +218,27 @@ describe('guest register screen', () => {
     expect(within(dialog).getByLabelText('Deposit status')).toHaveFocus()
     await user.click(within(dialog).getByRole('button', { name: 'Done' }))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('lets a guest alone pick PG or rented; a shared room stays PG', async () => {
+    asRole('manager')
+    const user = userEvent.setup()
+    show(<GuestRegister />)
+    const table = await screen.findByRole('table', { name: 'Guest register' })
+    await user.click(within(table).getByRole('button', { name: 'Details, Rahul Sinha' }))
+    let dialog = screen.getByRole('dialog', { name: 'Guest details: Rahul Sinha' })
+    expect(within(dialog).queryByLabelText('Room type')).not.toBeInTheDocument()
+    expect(dialog).toHaveTextContent('Rooms with 2 or more guests are always PG')
+    await user.click(within(dialog).getByRole('button', { name: 'Done' }))
+    await user.click(within(table).getByRole('button', { name: 'Details, Neha Joshi' }))
+    dialog = screen.getByRole('dialog', { name: 'Guest details: Neha Joshi' })
+    const type = within(dialog).getByLabelText('Room type')
+    expect(type).toHaveValue('rented')
+    await user.selectOptions(type, 'pg')
+    expect(await within(dialog).findByText('Saved')).toBeInTheDocument()
+    expect(supabase.from).toHaveBeenCalledWith('register_guests')
+    expect(within(table).getByText('PG · 1')).toBeInTheDocument()
+    expect(screen.getByText('Rented rooms', { selector: 'p' }).nextSibling).toHaveTextContent('0')
   })
 
   it('shows the details read-only to a caretaker', async () => {

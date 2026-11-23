@@ -95,3 +95,19 @@ describe('register summary', () => {
     await expect(summary(caretaker)).rejects.toThrow(/owner and managers/)
   })
 })
+
+describe('room type of a guest alone', () => {
+  it('counts a single guest marked PG as a PG room, and 2+ guests as PG whatever they are marked', async () => {
+    const before = (await summary(owner, 'P1')).totals
+    // Neha is alone in her room (the other entry is unnamed)
+    await db.query("update public.register_guests set room_type = 'pg' where name = 'Neha'")
+    const t = (await summary(owner, 'P1')).totals
+    expect([t.pg_rooms, t.pg_people, t.rented_rooms]).toEqual([before.pg_rooms + 1, before.pg_people + 1, before.rented_rooms - 1])
+    await db.query("update public.register_guests set room_type = 'rented' where name in ('Neha', 'Rahul', 'Amit')")
+    const back = (await summary(owner, 'P1')).totals
+    expect([back.pg_rooms, back.rented_rooms]).toEqual([before.pg_rooms, before.rented_rooms])
+  })
+  it('only takes pg or rented', async () => {
+    await expect(db.query("update public.register_guests set room_type = 'flat' where name = 'Neha'")).rejects.toThrow(/check/)
+  })
+})

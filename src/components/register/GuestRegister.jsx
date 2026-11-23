@@ -12,7 +12,8 @@ import { AddGuestModal, ChangesModal, CheckoutModal, History, PastGuests, Status
 
 // The guest register for one property: who is in which room, rent and deposit, check-in / check-out dates.
 // Owner and managers edit; a caretaker with "view customers" switched on only reads. Room type (PG or rented)
-// and the room counts follow from the list, so adding a second guest to a room turns it into a PG room at once.
+// and the room counts follow from the list: a second guest in a room turns it into a PG room at once, and a guest
+// alone can be marked PG or rented (room_type) in the Details popup.
 const KIND_TONE = { pg: 'navy', rented: 'green', empty: 'gray' }
 const people = (n) => `${n} ${n === 1 ? 'person' : 'people'}`
 const kindText = (room) => (room.kind === 'empty' ? 'Empty' : `${r.KIND_TEXT[room.kind]} · ${people(room.people)}`)
@@ -230,7 +231,7 @@ function Current({ pid, list, setList, rooms, roomNos, canEdit, reload }) {
       ))}
 
       {adding && <AddGuestModal pid={pid} roomNos={roomNos} room={adding.room} after={adding.after} onClose={() => setAdding(null)} onDone={() => { setAdding(null); reload() }} />}
-      {detailGuest && !leaving && <GuestDetails g={detailGuest} canEdit={canEdit} roomNos={roomNos} onSaved={saved} onClose={closeDetails}
+      {detailGuest && !leaving && <GuestDetails g={detailGuest} room={sum.rooms.find((x) => x.room_no === detailGuest.room_no)} canEdit={canEdit} roomNos={roomNos} onSaved={saved} onClose={closeDetails}
         onCheckout={setLeaving} />}
       {leaving && <CheckoutModal guest={leaving} onClose={() => setLeaving(null)} onDone={() => { setList((l) => l.filter((x) => x.id !== leaving.id)); setLeaving(null) }} />}
     </div>
@@ -343,8 +344,12 @@ function GuestTable({ rooms, onDetails }) {
 }
 
 // Popup with one guest's full entry. Owner / manager edit in place (each field saves when you leave it).
-function GuestDetails({ g, canEdit, roomNos, onSaved, onCheckout, onClose }) {
+// Room type: a guest alone in the room picks PG or rented; with 2 or more guests the room is PG, no choice.
+const TYPE_OPTS = [['rented', 'Rented (whole room)'], ['pg', 'PG (shared room)']]
+function GuestDetails({ g, room, canEdit, roomNos, onSaved, onCheckout, onClose }) {
   const date = (v) => (v ? formatDate(v) : '—')
+  const alone = r.occupies(g) && room?.people === 1
+  const typeText = !room || room.kind === 'empty' ? '—' : room.kind === 'pg' ? `PG · ${people(room.people)}` : 'Rented'
   return (
     <Modal title={g.name ? `Guest details: ${g.name}` : 'Guest details'} onClose={onClose} wide>
       {canEdit ? (
@@ -353,6 +358,13 @@ function GuestDetails({ g, canEdit, roomNos, onSaved, onCheckout, onClose }) {
             <EditCell g={g} k="name" label="Guest name" onSaved={onSaved} />
             <EditCell g={g} k="contact" label="Contact" type="tel" onSaved={onSaved} />
             <EditCell g={g} k="room_no" label="Room" options={roomNos.length ? roomNos.map((n) => [n, n]) : null} onSaved={onSaved} />
+            {alone ? <EditCell g={g} k="room_type" label="Room type" options={TYPE_OPTS} onSaved={onSaved} /> : (
+              <div>
+                <p className="text-xs font-medium text-slate-600">Room type</p>
+                <p className="mt-1"><Badge tone={KIND_TONE[room?.kind ?? 'empty']}>{typeText}</Badge></p>
+                {room?.people > 1 && <p className="mt-1 text-xs text-slate-600">Rooms with 2 or more guests are always PG. Change the room no to change this.</p>}
+              </div>
+            )}
             <EditCell g={g} k="rent" label="Rent (₹)" type="number" onSaved={onSaved} />
             <EditCell g={g} k="rent_status" label="Rent status" options={STATUS_OPTS} onSaved={onSaved} />
             <EditCell g={g} k="deposit" label="Deposit (₹)" type="number" onSaved={onSaved} />
@@ -372,6 +384,7 @@ function GuestDetails({ g, canEdit, roomNos, onSaved, onCheckout, onClose }) {
       ) : (
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
           <div><dt className="text-xs text-slate-500">Room</dt><dd>{g.room_no}</dd></div>
+          <div><dt className="text-xs text-slate-500">Room type</dt><dd>{typeText}</dd></div>
           <div><dt className="text-xs text-slate-500">Contact</dt><dd>{g.contact ? <a href={`tel:${g.contact}`} className="underline focus-visible:outline-2 focus-visible:outline-navy">{g.contact}</a> : '—'}</dd></div>
           <div><dt className="text-xs text-slate-500">Rent</dt><dd>{money(g.rent)} <StatusPill value={g.rent_status} /></dd></div>
           <div><dt className="text-xs text-slate-500">Deposit</dt><dd>{money(g.deposit)} <StatusPill value={g.deposit_status} /></dd></div>

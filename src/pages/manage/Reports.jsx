@@ -17,7 +17,7 @@ const mon = (r) => new Date(r.month).toLocaleDateString('en-IN', { month: 'short
 // `load` replaces the plain RPC call where the guest register's figures are added (services/reports.js).
 const REPORTS = [
   { key: 'register', name: 'Guest register by wing', fl: '', load: loadRegisterReport, args: (x) => ({ p_property: x.p }),
-    note: 'Current guests and rent as kept in the guest register (rooms with 1 guest count as rented, 2 or more as PG).',
+    note: 'Current guests and rent as kept in the guest register (rooms with 2 or more guests count as PG; a guest alone counts as PG or rented, as marked).',
     columns: [col('wing', 'Wing'), col('guests', 'Guests'), col('rooms_occupied', 'Rooms occupied'), col('rooms_total', 'Rooms'), col('occupancy_pct', 'Occupancy %'),
       col('pg_rooms', 'PG rooms'), col('pg_people', 'PG guests'), col('rented_rooms', 'Rented rooms'), col('empty_rooms', 'Empty rooms'),
       money('rent_roll', 'Monthly rent'), money('rent_paid', 'Rent paid'), money('rent_pending', 'Rent pending'), col('rent_pending_guests', 'Guests pending'),
