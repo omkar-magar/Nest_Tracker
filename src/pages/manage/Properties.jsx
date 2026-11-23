@@ -7,6 +7,9 @@ import { Badge, Button, Card, Notice } from '../../components/ui'
 import * as m from '../../services/manage'
 import { BED_STATES, bedState, label } from '../../services/pg'
 import { formatDate, rupees } from '../../services/format'
+import { monthRange } from '../../services/dashboard'
+import { loadStayingGuests } from '../../services/register'
+import { roomRent } from '../../services/reports'
 
 const ROOM_FIELDS = (properties, categories) => [
   { key: 'id', label: 'Room id (used for photo file names)', required: true, help: 'e.g. p1-204. Cannot be changed later.' },
@@ -234,31 +237,21 @@ function BulkModal({ categories, onClose, onSaved }) {
 
 function RevenueTab() {
   const { property } = useScope()
-  const today = new Date()
-  const from = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10)
-  const to = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().slice(0, 10)
-  // PRD 2.4: per room, expected vs collected this month, current tenants, paid / due
+  // local dates: toISOString() would shift the month a day back in IST
+  const { from, to } = monthRange(0)
+  // PRD 2.4: per room, expected vs collected this month, current tenants (app and guest register), paid / due
   return (
-    <Load loader={() => Promise.all([m.rpc('report_rent_collection', { p_from: from, p_to: to, p_property: property || null }), m.loadRoomsWithBeds(property)])} deps={[property]}>
-      {([bills, rooms]) => {
-        const byRoom = rooms.map((r) => {
-          const mine = bills.filter((b) => b.room_id === r.id && b.kind !== 'deposit')
-          const beds = r.beds.filter((b) => b.is_active)
-          return {
-            id: r.id, room: `${r.property_id} · ${r.wing}-${r.room_no}`, beds: beds.length,
-            rent_per_bed: beds.map((b) => b.rent ?? r.price).join(' / '),
-            tenants: [...new Set(mine.map((b) => b.tenant))].join(', '),
-            expected: mine.reduce((s, b) => s + b.billed, 0), collected: mine.reduce((s, b) => s + b.collected, 0),
-            due: mine.reduce((s, b) => s + b.outstanding, 0),
-          }
-        })
+    <Load loader={() => Promise.all([m.rpc('report_rent_collection', { p_from: from, p_to: to, p_property: property || null }), m.loadRoomsWithBeds(property), loadStayingGuests(property)])} deps={[property]}>
+      {([bills, rooms, guests]) => {
+        const byRoom = roomRent(rooms, bills, guests)
         return (
           <DataTable title="Room-wise rent" rows={byRoom} columns={[
             { key: 'room', label: 'Room' }, { key: 'beds', label: 'Beds' }, { key: 'rent_per_bed', label: 'Rent per bed (₹)' },
             { key: 'tenants', label: 'Current tenants' },
             { key: 'expected', label: 'Expected this month', render: (r) => rupees(r.expected) },
             { key: 'collected', label: 'Collected', render: (r) => rupees(r.collected) },
-            { key: 'due', label: 'Due', render: (r) => (r.due ? <span className="font-semibold text-red-700">{rupees(r.due)}</span> : 'Paid') },
+            { key: 'due', label: 'Due', render: (r) => (r.due ? <span className="font-semibold text-red-700">{rupees(r.due)}</span>
+              : r.unknown ? 'Not updated' : r.expected ? 'Paid' : '—') },
           ]} />
         )
       }}

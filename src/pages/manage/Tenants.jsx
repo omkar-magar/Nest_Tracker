@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import useAsync from '../../hooks/useAsync'
+import { STATUS_TEXT, searchGuests } from '../../services/register'
 import DataTable from '../../components/manage/DataTable'
 import { ActionMsg, FormFields, Load, Modal, StatusBadge, useAction, useScope } from '../../components/manage/kit'
 import { TENANT_FIELDS, validateTenant } from '../../components/manage/tenantFields'
@@ -17,7 +19,10 @@ export default function Tenants() {
   const navigate = useNavigate()
   const registering = params.get('new') === '1'
 
+  const q = params.get('q') ?? ''
   return (
+    <>
+    {q && <RegisterMatches q={q} property={property} />}
     <Load loader={() => m.loadTenants(property)} deps={[property]}>
       {(list, reload) => {
         const rows = list.map((t) => {
@@ -61,6 +66,28 @@ export default function Tenants() {
         )
       }}
     </Load>
+    </>
+  )
+}
+
+// Most current guests live in the guest register (no login), so a header search looks there too
+function RegisterMatches({ q, property }) {
+  const hits = useAsync(() => searchGuests(q, property), [q, property])
+  if (!hits.data?.length) return null
+  return (
+    <section aria-label="Guest register matches" className="mb-5 rounded-2xl border border-navy/10 bg-cream p-4">
+      <h3 className="mb-2 text-sm font-semibold">In the guest register ({hits.data.length}{hits.data.length === 20 ? '+' : ''})</h3>
+      <ul className="flex flex-wrap gap-2">
+        {hits.data.map((g) => (
+          <li key={g.id}>
+            <Link to={`/admin/register?wing=${encodeURIComponent(g.property_id)}&q=${encodeURIComponent(g.name)}`}
+              className="block rounded-full border border-navy/15 bg-white px-3 py-1 text-sm hover:border-navy focus-visible:outline-2 focus-visible:outline-navy">
+              <span className="font-medium">{g.name}</span> <span className="text-slate-600">· {g.property_id} · Room {g.room_no} · rent {STATUS_TEXT[g.rent_status] ?? g.rent_status}</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
 

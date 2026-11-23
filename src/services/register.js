@@ -41,6 +41,26 @@ export const returnGuest = (id) => rpc('register_return', { p_id: id })
 export const removeEntry = (id) => deleteRow('register_guests', id)
 export const restoreHistory = (id) => rpc('register_restore', { p_history: id })
 
+// Staying guests of one wing or, with no pid, every wing the login may see; for the bed board and reports
+export const loadStayingGuests = (pid) => rows('register_guests', 'id, property_id, room_no, name, rent, rent_status, expected_checkout',
+  (q) => (pid ? q.eq('property_id', pid) : q).is('checked_out_on', null).order('sort_order').limit(2000))
+// staying guests whose name, contact or room contains `text` (header search); characters PostgREST's or() treats
+// as syntax are dropped
+export function searchGuests(text, pid) {
+  const s = String(text ?? '').replace(/[,()*%\\"]/g, ' ').replace(/\s+/g, ' ').trim()
+  if (!s) return Promise.resolve([])
+  return rows('register_guests', 'id, property_id, room_no, name, contact, rent_status, check_in', (q) =>
+    (pid ? q.eq('property_id', pid) : q).is('checked_out_on', null).neq('name', '')
+      .or(`name.ilike.*${s}*,contact.ilike.*${s}*,room_no.ilike.*${s}*`).order('room_no').limit(20))
+}
+// "P1|A-101" -> named guests in that room, so app rooms ({ property_id, wing, room_no }) can find theirs
+export const guestKey = (room) => `${room.property_id}|${roomKey(room)}`
+export function guestsByRoom(guests = []) {
+  const by = {}
+  for (const g of guests.filter(occupies)) (by[`${g.property_id}|${g.room_no}`] ??= []).push(g)
+  return by
+}
+
 // Figures for the dashboards (owner and managers only): per wing and grand total, who is leaving, whose rent is
 // pending, latest arrivals / departures. '' or null = every wing the login may see.
 export const EMPTY_SUMMARY = { totals: {}, properties: [], leaving: [], rent_pending: [], recent: [] }

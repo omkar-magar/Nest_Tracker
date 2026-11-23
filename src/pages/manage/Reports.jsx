@@ -5,6 +5,7 @@ import { BarChart, HBarChart } from '../../components/manage/Charts'
 import { Field, inputCls } from '../../components/ui'
 import * as m from '../../services/manage'
 import { label, monthStart, ymd } from '../../services/pg'
+import { loadOccupancy, loadPL, loadRegisterReport, loadTrends } from '../../services/reports'
 import { formatDate, rupees } from '../../services/format'
 
 const money = (k, l) => ({ key: k, label: l, render: (r) => rupees(r[k]), value: (r) => Number(r[k] ?? 0) })
@@ -12,10 +13,19 @@ const date = (k, l) => ({ key: k, label: l, render: (r) => formatDate(r[k]), val
 const col = (k, l, fn) => ({ key: k, label: l, ...(fn ? { value: fn } : {}) })
 const mon = (r) => new Date(r.month).toLocaleDateString('en-IN', { month: 'short', year: '2-digit' })
 
-// filters each report understands: d = dates, f = floor, r = room, t = tenant (property comes from the switcher)
+// filters each report understands: d = dates, f = floor, r = room, t = tenant (property comes from the switcher).
+// `load` replaces the plain RPC call where the guest register's figures are added (services/reports.js).
 const REPORTS = [
-  { key: 'occupancy', name: 'Occupancy', fl: 'dfr', rpc: 'report_occupancy', args: (x) => ({ p_from: x.from, p_to: x.to, p_property: x.p, p_floor: x.floor, p_room: x.room }),
-    columns: [col('property_id', 'Property'), col('floor', 'Floor'), col('room_no', 'Room'), col('beds', 'Beds'), col('occupied_now', 'Occupied now'), col('vacant_now', 'Vacant'),
+  { key: 'register', name: 'Guest register by wing', fl: '', load: loadRegisterReport, args: (x) => ({ p_property: x.p }),
+    note: 'Current guests and rent as kept in the guest register (rooms with 1 guest count as rented, 2 or more as PG).',
+    columns: [col('wing', 'Wing'), col('guests', 'Guests'), col('rooms_occupied', 'Rooms occupied'), col('rooms_total', 'Rooms'), col('occupancy_pct', 'Occupancy %'),
+      col('pg_rooms', 'PG rooms'), col('pg_people', 'PG guests'), col('rented_rooms', 'Rented rooms'), col('empty_rooms', 'Empty rooms'),
+      money('rent_roll', 'Monthly rent'), money('rent_paid', 'Rent paid'), money('rent_pending', 'Rent pending'), col('rent_pending_guests', 'Guests pending'),
+      col('rent_partial_guests', 'Part paid'), money('deposit_held', 'Deposits held'), col('checkins_month', 'Check-ins this month'),
+      col('checkouts_month', 'Check-outs this month'), col('leaving_week', 'Leaving in 7 days')] },
+  { key: 'occupancy', name: 'Occupancy', fl: 'dfr', load: loadOccupancy, args: (x) => ({ p_from: x.from, p_to: x.to, p_property: x.p, p_floor: x.floor, p_room: x.room }),
+    note: 'Bed figures count check-ins made in the app; "Guests in register" counts the guest register.',
+    columns: [col('property_id', 'Property'), col('floor', 'Floor'), col('room_no', 'Room'), col('beds', 'Beds'), col('register_guests', 'Guests in register'), col('occupied_now', 'Occupied now'), col('vacant_now', 'Vacant'),
       col('reserved_now', 'Reserved'), col('blocked_now', 'Blocked'), col('occupied_bed_nights', 'Bed-nights used'), col('available_bed_nights', 'Bed-nights available'),
       col('occupancy_pct', 'Occupancy %'), col('vacancy_days_per_bed', 'Vacant days per bed')] },
   { key: 'collection', name: 'Rent collection', fl: 'dfrt', rpc: 'report_rent_collection', args: (x) => ({ p_from: x.from, p_to: x.to, p_property: x.p, p_floor: x.floor, p_room: x.room, p_tenant: x.tenant }),
@@ -28,9 +38,10 @@ const REPORTS = [
     columns: [date('spent_on', 'Date'), col('property_id', 'Property'), col('category', 'Category'), col('grp', 'Group', (r) => label(r.grp)), money('amount', 'Amount'),
       col('vendor', 'Vendor'), col('payment_mode', 'Mode', (r) => label(r.payment_mode)), col('status', 'Status'), col('source', 'Source'), col('notes', 'Notes')],
     chart: (rows) => <HBarChart title="Expense by category (approved)" data={Object.entries(rows.filter((r) => r.status === 'approved').reduce((s, r) => ({ ...s, [r.category]: (s[r.category] ?? 0) + r.amount }), {})).map(([l, v]) => ({ label: l, value: v }))} /> },
-  { key: 'pl', name: 'Profit & loss', fl: 'd', rpc: 'report_profit_loss', args: (x) => ({ p_from: x.from, p_to: x.to, p_property: x.p }),
+  { key: 'pl', name: 'Profit & loss', fl: 'd', load: loadPL, args: (x) => ({ p_from: x.from, p_to: x.to, p_property: x.p }),
+    note: 'Rent includes rent marked paid in the guest register, counted in the month it was marked paid.',
     columns: [{ key: 'month', label: 'Month', value: mon }, col('property_id', 'Property', (r) => (r.property_id === 'ALL' ? 'All (combined)' : r.property_id)),
-      money('rent', 'Rent'), money('charges', 'Charges'), money('late_fees', 'Late fees'), money('deposits_kept', 'Deposits kept'), money('other_income', 'Other income'),
+      money('rent', 'Rent'), money('register_rent', 'of which register'), money('charges', 'Charges'), money('late_fees', 'Late fees'), money('deposits_kept', 'Deposits kept'), money('other_income', 'Other income'),
       money('total_income', 'Total income'), money('utilities', 'Utilities'), money('salaries', 'Salaries'), money('maintenance', 'Maintenance'), money('food', 'Food'),
       money('other_expense', 'Other'), money('total_expense', 'Total expense'), money('profit', 'Profit')],
     chart: (rows) => {
@@ -55,8 +66,9 @@ const REPORTS = [
     columns: [col('ticket_no', '#'), col('property_id', 'Property'), col('room_no', 'Room'), col('category', 'Category', (r) => label(r.category)), col('title', 'Issue'),
       col('priority', 'Priority'), col('status', 'Status'), date('created', 'Raised'), col('resolution_hours', 'Hours to resolve'), col('overdue', 'Overdue', (r) => (r.overdue ? 'yes' : '')),
       col('assignee', 'Assigned to'), money('cost', 'Cost'), col('rating', 'Rating')] },
-  { key: 'trends', name: '12-month trends', fl: '', rpc: 'report_trends', args: (x) => ({ p_property: x.p, p_months: 12 }),
-    columns: [{ key: 'month', label: 'Month', value: mon }, col('occupancy_pct', 'Occupancy %'), money('revenue', 'Revenue'), money('expenses', 'Expenses'), money('profit', 'Profit'),
+  { key: 'trends', name: '12-month trends', fl: '', load: loadTrends, args: (x) => ({ p_property: x.p, p_months: 12 }),
+    note: 'Revenue includes rent marked paid in the guest register. Occupancy % counts beds checked in through the app; current register occupancy is in "Guest register by wing".',
+    columns: [{ key: 'month', label: 'Month', value: mon }, col('occupancy_pct', 'Bed occupancy % (app)'), money('revenue', 'Revenue'), money('register_rent', 'of which register'), money('expenses', 'Expenses'), money('profit', 'Profit'),
       col('enquiries', 'Enquiries'), col('bookings', 'Converted'), col('conversion_pct', 'Enquiry → tenant %')],
     chart: (rows) => (
       <div className="grid gap-4 lg:grid-cols-2">
@@ -85,7 +97,9 @@ const REPORTS = [
 ]
 
 export default function Reports() {
-  const { property } = useScope()
+  const { property, properties } = useScope()
+  // wings in view: register rent is fetched per wing so P&L can split it
+  const wings = property ? [property] : properties.map((p) => p.id)
   const [key, setKey] = useState('pl')
   const [x, setX] = useState({ from: `${new Date().getFullYear()}-01-01`, to: ymd(), floor: '', room: '', tenant: '' })
   const rep = REPORTS.find((r) => r.key === key)
@@ -127,12 +141,13 @@ export default function Reports() {
           )}
         </Load>
       </div>
-      <Load loader={() => m.rpc(rep.rpc, args)} deps={[key, JSON.stringify(args)]}>
+      <Load loader={() => (rep.load ? rep.load(args, wings) : m.rpc(rep.rpc, args))} deps={[key, JSON.stringify(args), wings.join()]}>
         {(rows) => (
           <div className="space-y-6">
             {rep.chart && rows.length > 0 && rep.chart(rows)}
             <div>
               <H3>{rep.name}</H3>
+              {rep.note && <p className="-mt-1 mb-3 text-sm text-slate-600">{rep.note}</p>}
               <DataTable title={rep.name} rows={rows.map((r, i) => ({ id: i, ...r }))} columns={rep.columns} pageSize={100} />
             </div>
           </div>

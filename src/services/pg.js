@@ -18,7 +18,7 @@ export function bedState(b) {
 }
 
 // Invoice label, same rules as public.bill_state()
-export function invoiceState(b, today = new Date().toISOString().slice(0, 10)) {
+export function invoiceState(b, today = ymd()) {
   if (b.status === 'void') return 'void'
   if (b.status === 'paid') return 'paid'
   if (b.due_date < today) return 'overdue'
@@ -81,9 +81,10 @@ export const monthStart = (d = new Date()) => ymd(new Date(d.getFullYear(), d.ge
 export const addDays = (s, n) => { const d = new Date(`${s}T00:00`); d.setDate(d.getDate() + n); return ymd(d) }
 
 // WhatsApp-ready vacancy message built from live bed data (PRD 9.4)
-export function vacancyMessage(rooms, { brandName, phone, url }) {
+// taken(room): beds in use that the bed records don't know about (guests kept only in the guest register)
+export function vacancyMessage(rooms, { brandName, phone, url, taken = () => 0 }) {
   const lines = rooms
-    .map((r) => ({ r, free: (r.beds || []).filter((b) => bedState(b) === 'vacant').length }))
+    .map((r) => ({ r, free: Math.max(0, (r.beds || []).filter((b) => bedState(b) === 'vacant').length - taken(r)) }))
     .filter((x) => x.free > 0)
     .map(({ r, free }) => `• Room ${r.room_no} (${r.ac_type}, ${label(r.room_type)}): ${free} bed${free > 1 ? 's' : ''} free · ₹${Number(r.price).toLocaleString('en-IN')}/${r.billing_period === 'night' ? 'night' : 'month'}`)
   if (!lines.length) return `${brandName}: we are full right now. Call ${phone} to join the waiting list.`

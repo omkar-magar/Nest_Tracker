@@ -8,6 +8,7 @@ import DataTable from '../../components/manage/DataTable'
 import { Button, ErrorBox, Notice, TableSkeleton } from '../../components/ui'
 import * as m from '../../services/manage'
 import { BED_STATES, addDays, bedState, label, vacancyMessage, ymd } from '../../services/pg'
+import { guestKey, guestsByRoom, loadStayingGuests } from '../../services/register'
 import { brand } from '../../data/site'
 import { formatDate, rupees, whatsappLink } from '../../services/format'
 
@@ -20,6 +21,8 @@ export default function Beds() {
     m.loadRoomsWithBeds(property),
     m.loadReservations(),
     manage ? m.loadOccupants() : Promise.resolve([]),
+    // most current guests are kept in the guest register, not checked in through the app
+    manage ? loadStayingGuests(property) : Promise.resolve([]),
   ]), [property, manage])
   const [bed, setBed] = useState(null)
   const [filter, setFilter] = useState('')
@@ -36,7 +39,9 @@ export default function Beds() {
 
   const view = useMemo(() => {
     if (!data.data) return null
-    const [rooms, resv, occ] = data.data
+    const [rooms, resv, occ, staying] = data.data
+    const register = guestsByRoom(staying)
+    const inRegister = (r) => register[guestKey(r)] ?? []
     const occupant = Object.fromEntries(occ.map((o) => [o.bed_id, o.bookings]))
     const reservation = Object.fromEntries(resv.map((r) => [r.bed_id, r]))
     const floors = {}
@@ -50,15 +55,21 @@ export default function Beds() {
       .map((o) => ({ id: o.bed_id, bed: all.find((b) => b.id === o.bed_id)?.code, name: o.bookings.profiles?.full_name, date: o.bookings.expected_checkout,
         notice: o.bookings.notice_date, customer: o.bookings.customer_id }))
       .sort((a, b) => a.date.localeCompare(b.date))
-    return { rooms, floors, occupant, reservation, counts, upcoming }
+    const regRooms = rooms.filter((r) => inRegister(r).length)
+    const reg = {
+      total: Object.values(register).reduce((s, list) => s + list.length, 0),
+      shown: regRooms.reduce((s, r) => s + inRegister(r).length, 0),
+      rooms: regRooms.length,
+    }
+    return { rooms, floors, occupant, reservation, counts, upcoming, inRegister, reg }
   }, [data.data, manage])
 
   if (data.loading) return <TableSkeleton />
   if (data.error) return <ErrorBox error={data.error} onRetry={data.reload} />
-  const { floors, occupant, reservation, counts, upcoming, rooms } = view
+  const { floors, occupant, reservation, counts, upcoming, rooms, inRegister, reg } = view
 
   const share = () => {
-    const msg = vacancyMessage(rooms, { brandName: brand.name, phone: brand.phone, url: `${window.location.origin}/vacancies` })
+    const msg = vacancyMessage(rooms, { brandName: brand.name, phone: brand.phone, url: `${window.location.origin}/vacancies`, taken: (r) => inRegister(r).length })
     setShared(msg)
   }
 
@@ -75,6 +86,14 @@ export default function Beds() {
         <Button variant="outline" className="ml-auto !py-1.5" onClick={share}>Share vacancies</Button>
       </div>
 
+      {reg.total > 0 && (
+        <p className="mb-4 rounded-2xl border border-navy/10 bg-cream px-4 py-3 text-sm">
+          <Link to="/admin/register" className="font-semibold underline focus-visible:outline-2 focus-visible:outline-navy">Guest register</Link>:{' '}
+          {reg.total} guest{reg.total === 1 ? '' : 's'} staying in {reg.rooms} room{reg.rooms === 1 ? '' : 's'}
+          {reg.shown < reg.total && ` (${reg.total - reg.shown} in rooms not on this board)`}.
+          {' '}Bed colours follow check-ins made in the app; register guests are listed on each room card and left out of Share vacancies.
+        </p>
+      )}
       {Object.keys(floors).length === 0 && <Notice>No rooms yet. Add them under Properties & rooms.</Notice>}
       <div className="space-y-6">
         {Object.entries(floors).map(([floor, list]) => (
@@ -84,6 +103,12 @@ export default function Beds() {
               {list.map((r) => (
                 <div key={r.id} className="rounded-2xl border border-navy/10 bg-white p-3">
                   <p className="text-sm font-semibold">Room {r.room_no} <span className="font-normal text-slate-500">· {label(r.room_type)} · {r.ac_type}</span></p>
+                  {inRegister(r).length > 0 && (
+                    <p className="mt-1 text-xs text-slate-700">
+                      <span className="rounded-full bg-navy/10 px-2 py-0.5 font-semibold text-navy">In register: {inRegister(r).length} of {r.beds.length} bed{r.beds.length === 1 ? '' : 's'}</span>{' '}
+                      {inRegister(r).map((g) => g.name).join(', ')}
+                    </p>
+                  )}
                   <div className="mt-2 flex flex-wrap gap-2">
                     {r.beds.sort((a, b) => a.label.localeCompare(b.label)).filter((b) => !filter || bedState(b) === filter).map((b) => {
                       const st = bedState(b)

@@ -22,7 +22,13 @@ export default function GuestRegister({ property }) {
   const { role } = useAuth()
   const canEdit = role === 'admin' || role === 'manager'
   const props = useAsync(r.loadRegisterProperties, [])
-  const [chosen, setChosen] = useState(() => { try { return localStorage.getItem('yolo.register.property') ?? '' } catch { return '' } })
+  const location = useLocation()
+  // ?wing= (from a tenant search hit) opens that wing; otherwise the one picked last time
+  const [chosen, setChosen] = useState(() => {
+    const wing = new URLSearchParams(location.search).get('wing')
+    if (wing) return wing
+    try { return localStorage.getItem('yolo.register.property') ?? '' } catch { return '' }
+  })
 
   if (property) return <Register key={property} pid={property} canEdit={canEdit} />
   if (props.loading) return <TableSkeleton />
@@ -102,7 +108,8 @@ const EXPORT_COLS = (kindOf) => [
 
 function Current({ pid, list, setList, rooms, roomNos, canEdit, reload }) {
   const [edit, setEdit] = useState(false)
-  const [q, setQ] = useState('')
+  const location = useLocation()
+  const [q, setQ] = useState(() => new URLSearchParams(location.search).get('q') ?? '')
   const [rentF, setRentF] = useState('')
   const [depF, setDepF] = useState('')
   const [kindF, setKindF] = useState('')
