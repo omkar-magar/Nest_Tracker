@@ -46,7 +46,9 @@ describe('summarize', () => {
     { amount: 800, status: 'failed' },
     { amount: 400, status: 'created' },
   ]
-  const s = summarize(bills, payments)
+  // built after the outer beforeEach so the fake clock applies
+  let s
+  beforeEach(() => { s = summarize(bills, payments) })
 
   it('sorts unpaid bills by due date and picks the earliest as next', () => {
     expect(s.unpaid.map((b) => b.id)).toEqual(['late', 'soon', 'later'])
