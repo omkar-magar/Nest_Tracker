@@ -7,6 +7,7 @@ import { BarChart } from '../../components/manage/Charts'
 import Icon from '../../components/manage/Icon'
 import { Notice, inputCls } from '../../components/ui'
 import { ago, loadAdminDashboard, pctChange } from '../../services/dashboard'
+import { departures, withRegister } from '../../services/register'
 import { formatDate, rupees } from '../../services/format'
 
 // PRD 7.1: this month's money, income vs expenses, where the money went, what needs attention, occupancy,
@@ -161,8 +162,18 @@ function DueChip({ days }) {
   return <span className="rounded-full bg-chart-1/10 px-2.5 py-0.5 text-xs font-semibold text-navy">Due in {days} day{days > 1 ? 's' : ''}</span>
 }
 
+// "4 guests in the register (1 part paid)", plus app tenants with unpaid bills when there are any
+function pendingHint(r, rent, m) {
+  const due = Number(r.rent_pending_guests ?? 0); const part = Number(r.rent_partial_guests ?? 0)
+  const parts = [`${due + part} guest${due + part === 1 ? '' : 's'}${part ? ` (${part} part paid)` : ''}`]
+  if (rent.tenants) parts.push(`${rent.tenants} app tenant${rent.tenants === 1 ? '' : 's'}`)
+  if (m.overdue) parts.push(`${rupees(m.overdue)} overdue`)
+  return parts.join(' · ')
+}
+
 const ACTIONS = [
-  ['/admin/expenses', 'plus', 'Add expense', 'bg-chart-1 text-white hover:bg-chart-1/90'],
+  ['/admin/register', 'userPlus', 'Add guest', 'bg-chart-1 text-white hover:bg-chart-1/90'],
+  ['/admin/expenses', 'plus', 'Add expense', 'bg-chart-1/10 text-navy hover:bg-chart-1/20'],
   ['/admin/billing', 'card', 'Record payment', 'bg-chart-3/15 text-navy hover:bg-chart-3/25'],
   ['/admin/complaints?new=1', 'wrench', 'Raise maintenance', 'bg-chart-4/15 text-navy hover:bg-chart-4/25'],
   ['/admin/tenants?new=1', 'userPlus', 'Add tenant', 'bg-chart-1/10 text-navy hover:bg-chart-1/20'],
@@ -196,9 +207,12 @@ export default function Dashboard() {
       </div>
 
       <Load loader={() => loadAdminDashboard(property, period)} deps={[property, period]}>
-        {({ d, trend, breakdown, rent, bills, activities }) => {
+        {({ d, reg, trend, breakdown, rent, bills, activities }) => {
           if (!d) return <Notice>No data yet. Add a property and rooms to get started.</Notice>
           const b = d.beds ?? {}; const m = d.money ?? {}; const c = d.complaints ?? {}
+          // r: the guest register, where the PG's current guests and their rent status are kept
+          const r = reg.totals ?? {}
+          const regDue = Number(r.rent_pending_guests ?? 0) + Number(r.rent_partial_guests ?? 0)
           // trend runs oldest -> this month; `period` steps back from the end
           const at = (i) => trend[trend.length - 1 + period + i]
           const cur = at(0); const prev = at(-1)
@@ -206,25 +220,26 @@ export default function Dashboard() {
           const spent = Number(cur?.expenses ?? m.expenses ?? 0)
           const net = revenue - spent
           const upto = trend.slice(0, trend.length + period)
-          const occNow = Number(b.occupancy_pct ?? 0)
-          const occPrev = trend.length > 1 ? Number(trend[trend.length - 2].occupancy_pct ?? 0) : null
-          const occDelta = occPrev == null ? null : Math.round((Number(trend[trend.length - 1].occupancy_pct ?? 0) - occPrev) * 10) / 10
           const week = new Date(); week.setDate(week.getDate() + 7)
-          const leaving = (d.upcoming_checkouts ?? []).filter((x) => new Date(x.date) <= week).length
+          const leaving = (d.upcoming_checkouts ?? []).filter((x) => new Date(x.date) <= week).length + Number(r.leaving_week ?? 0)
           const utilities = bills.filter((x) => x.grp === 'utilities' && x.days != null && x.days <= 7).length
-          const alerts = [rent.overdueTenants, leaving, utilities, c.open ?? 0]
+          const rentAlert = regDue + rent.overdueTenants
+          const alerts = [rentAlert, leaving, utilities, c.open ?? 0]
 
           const compare = (
             <>
               <H3>{property ? 'Compare wings' : 'Wing by wing'}</H3>
               {!property && <p className="mb-3 rounded-2xl border border-navy/10 bg-cream px-4 py-3 text-sm">Grand total: the table shows each wing on its own, and the figures above add all wings together. Pick a wing at the top to see only that wing.</p>}
-              <DataTable title="Wing by wing" search={false} rows={d.properties ?? []} columns={[
+              <DataTable title="Wing by wing" search={false} rows={withRegister(d.properties, reg)} columns={[
                 { key: 'name', label: 'Wing', value: (r) => r.name },
-                { key: 'occupancy_pct', label: 'Occupancy', render: (r) => `${r.occupancy_pct}% (${r.occupied}/${r.beds})`, value: (r) => Number(r.occupancy_pct) },
+                { key: 'guests', label: 'Guests', render: (r) => r.reg.guests ?? 0, value: (r) => Number(r.reg.guests ?? 0) },
+                { key: 'rooms', label: 'Rooms occupied', render: (r) => `${r.reg.rooms_occupied ?? 0}/${r.reg.rooms_total ?? 0} (${r.reg.occupancy_pct ?? 0}%)`, value: (r) => Number(r.reg.occupancy_pct ?? 0) },
+                { key: 'mix', label: 'PG · rented · empty', render: (r) => `${r.reg.pg_rooms ?? 0} · ${r.reg.rented_rooms ?? 0} · ${r.reg.empty_rooms ?? 0}`, value: (r) => Number(r.reg.empty_rooms ?? 0) },
+                { key: 'rent_roll', label: 'Monthly rent', render: (r) => rupees(r.reg.rent_roll), value: (r) => Number(r.reg.rent_roll ?? 0) },
                 { key: 'revenue', label: 'Revenue', render: (r) => rupees(r.revenue), value: (r) => Number(r.revenue) },
                 { key: 'expenses', label: 'Expenses', render: (r) => rupees(r.expenses), value: (r) => Number(r.expenses) },
                 { key: 'profit', label: 'Profit', render: (r) => rupees(r.profit), value: (r) => Number(r.profit) },
-                { key: 'pending', label: 'Pending rent', render: (r) => rupees(r.pending), value: (r) => Number(r.pending) },
+                { key: 'pending', label: 'Pending rent', render: (r) => rupees(Number(r.pending ?? 0) + Number(r.reg.rent_pending ?? 0)), value: (r) => Number(r.pending ?? 0) + Number(r.reg.rent_pending ?? 0) },
                 { key: 'complaints_open', label: 'Open complaints', render: (r) => `${r.complaints_open}${r.complaints_overdue ? ` (${r.complaints_overdue} overdue)` : ''}`, value: (r) => r.complaints_open },
                 { key: 'collection_efficiency', label: 'Collection', render: (r) => (r.collection_efficiency == null ? '—' : `${r.collection_efficiency}%`), value: (r) => Number(r.collection_efficiency ?? 0) },
               ]} />
@@ -240,8 +255,8 @@ export default function Dashboard() {
                   spark={upto.map((t) => Number(t.expenses))} periodLabel={periodLabel} />
                 <Kpi tone={3} icon="trend" label="Net income" value={rupees(net)} change={pctChange(net, prev ? Number(prev.revenue) - Number(prev.expenses) : 0)}
                   spark={upto.map((t) => Number(t.revenue) - Number(t.expenses))} periodLabel={periodLabel} />
-                <Kpi tone={2} icon="clock" label="Pending rent" value={rupees(m.pending)}
-                  hint={`${rent.tenants} tenant${rent.tenants === 1 ? '' : 's'}${m.overdue ? ` · ${rupees(m.overdue)} overdue` : ''}`} />
+                <Kpi tone={2} icon="clock" label="Pending rent" value={rupees(Number(m.pending ?? 0) + Number(r.rent_pending ?? 0))}
+                  hint={pendingHint(r, rent, m)} />
               </section>
 
               <div className="mt-4 grid gap-4 lg:grid-cols-12">
@@ -263,10 +278,10 @@ export default function Dashboard() {
                 <section className={`${card} lg:col-span-3`} aria-label="Quick alerts">
                   <PanelHead icon="bell" title="Quick alerts" badge={alerts.filter(Boolean).length} />
                   <ul className="space-y-2">
-                    <Alert to="/admin/billing" icon="alert" tint="border-red-200 bg-red-50" title="Overdue rent" urgent={rent.overdueTenants > 0}
-                      line={`${rent.overdueTenants} tenant${rent.overdueTenants === 1 ? '' : 's'}`} />
-                    <Alert to="/admin/tenants" icon="calendar" tint="border-chart-2/25 bg-chart-2/10" title="Upcoming check-outs"
-                      line={`${leaving} tenant${leaving === 1 ? '' : 's'} in 7 days`} />
+                    <Alert to={regDue || !rent.overdueTenants ? '/admin/register' : '/admin/billing'} icon="alert" tint="border-red-200 bg-red-50" title="Rent pending" urgent={rentAlert > 0}
+                      line={`${rentAlert} guest${rentAlert === 1 ? '' : 's'}${rent.overdueTenants ? ` · ${rent.overdueTenants} overdue in billing` : ''}`} />
+                    <Alert to="/admin/register" icon="calendar" tint="border-chart-2/25 bg-chart-2/10" title="Upcoming check-outs"
+                      line={`${leaving} guest${leaving === 1 ? '' : 's'} in 7 days`} />
                     <Alert to="/admin/expenses" icon="doc" tint="border-chart-1/20 bg-chart-1/10" title="Upcoming utility bills"
                       line={`${utilities} bill${utilities === 1 ? '' : 's'} in 7 days`} />
                     <Alert to="/admin/complaints" icon="wrench" tint="border-chart-4/25 bg-chart-4/10" title="Pending maintenance" urgent={(c.overdue ?? 0) > 0}
@@ -277,24 +292,25 @@ export default function Dashboard() {
 
               <div className="mt-4 grid gap-4 lg:grid-cols-3">
                 <section className={card} aria-label="Occupancy overview">
-                  <PanelHead icon="bed" title="Occupancy overview" to="/admin/beds" link="View details" />
+                  <PanelHead icon="bed" title="Occupancy overview" to="/admin/register" link="Guest register" />
                   <div className="flex flex-wrap items-center gap-5">
-                    <OccupancyRing pct={occNow} />
+                    <OccupancyRing pct={Number(r.occupancy_pct ?? 0)} />
                     <dl className="space-y-3">
-                      {[['Occupied beds', b.occupied], ['Available beds', b.vacant], ['Total beds', b.total]].map(([k, v]) => (
+                      {[['users', 'Guests staying', r.guests], ['bed', 'Rooms occupied', `${r.rooms_occupied ?? 0}/${r.rooms_total ?? 0}`], ['bed', 'Empty rooms', r.empty_rooms]].map(([icon, k, v]) => (
                         <div key={k} className="flex items-center gap-3">
-                          <span className="grid h-9 w-9 place-items-center rounded-xl bg-chart-1/10 text-chart-1"><Icon name="bed" /></span>
+                          <span className="grid h-9 w-9 place-items-center rounded-xl bg-chart-1/10 text-chart-1"><Icon name={icon} /></span>
                           <div className="flex flex-col-reverse"><dt className="text-xs text-slate-600">{k}</dt><dd className="text-lg font-bold leading-tight">{v ?? 0}</dd></div>
                         </div>
                       ))}
                     </dl>
                   </div>
-                  {(b.reserved > 0 || b.maintenance > 0) && (
-                    <p className="mt-3 text-xs text-slate-600">{b.reserved ?? 0} reserved · {b.maintenance ?? 0} under maintenance</p>
-                  )}
-                  {occDelta != null && (
-                    <p className={`mt-3 inline-block rounded-full px-3 py-1 text-xs font-semibold ${occDelta >= 0 ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-700'}`}>
-                      {occDelta >= 0 ? '+' : ''}{occDelta} pts {occDelta >= 0 ? '↑' : '↓'} vs last month
+                  <p className="mt-3 text-xs text-slate-600">
+                    {r.pg_rooms ?? 0} PG rooms ({r.pg_people ?? 0} sharing) · {r.rented_rooms ?? 0} rented
+                    {(r.checkins_month > 0 || r.checkouts_month > 0) && ` · this month ${r.checkins_month ?? 0} in, ${r.checkouts_month ?? 0} out`}
+                  </p>
+                  {b.occupied > 0 && (
+                    <p className="mt-1 text-xs text-slate-600">
+                      <Link to="/admin/beds" className="underline focus-visible:outline-2 focus-visible:outline-navy">Bed board</Link>: {b.occupied} of {b.total} beds booked in the app{b.reserved ? ` · ${b.reserved} reserved` : ''}
                     </p>
                   )}
                 </section>
@@ -361,11 +377,12 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <H3>Upcoming check-outs (next 45 days)</H3>
-                  <DataTable title="Upcoming check-outs" search={false} rows={d.upcoming_checkouts ?? []} empty="Nobody is leaving soon" columns={[
+                  <DataTable title="Upcoming check-outs" search={false} rows={departures(d.upcoming_checkouts, reg.leaving)} empty="Nobody is leaving soon" columns={[
                     { key: 'date', label: 'Date', render: (r) => formatDate(r.date) },
-                    { key: 'name', label: 'Tenant', render: (r) => <Link className="underline" to={`/admin/tenants/${r.customer_id}`}>{r.name}</Link>, value: (r) => r.name },
+                    { key: 'name', label: 'Guest', value: (r) => r.name,
+                      render: (r) => (r.customer_id ? <Link className="underline" to={`/admin/tenants/${r.customer_id}`}>{r.name}</Link> : r.name) },
                     { key: 'room', label: 'Room' },
-                    { key: 'notice_date', label: 'Notice given', render: (r) => formatDate(r.notice_date) },
+                    { key: 'notice_date', label: 'Notice given', render: (r) => (r.source === 'register' ? 'Guest register' : formatDate(r.notice_date)) },
                   ]} />
                 </div>
               </div>

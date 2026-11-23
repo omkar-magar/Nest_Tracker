@@ -1,4 +1,5 @@
 import { ownerDashboard, rows, rpc } from './manage'
+import { EMPTY_SUMMARY, registerSummary } from './register'
 
 // The admin dashboard: KPI cards, income vs expenses, expense breakdown, alerts, occupancy, recent activity and
 // upcoming bills. Money maths stays in the database RPCs; this file only picks, groups and sorts what they return.
@@ -53,10 +54,19 @@ export function upcomingBills(recurring, payslips, today = new Date()) {
   return bills.sort((a, b) => (a.days ?? -1) - (b.days ?? -1))
 }
 
+// guest register events from register_summary: added, checked out, back again, rent marked paid
+const REGISTER_EVENT = {
+  INSERT: (r) => ({ kind: 'checkin', text: `${r.name} added to Room ${r.room}` }),
+  RETURN: (r) => ({ kind: 'checkin', text: `${r.name} is back in Room ${r.room}` }),
+  CHECKOUT: (r) => ({ kind: 'vacant', text: `${r.name} checked out of Room ${r.room}` }),
+  PAID: (r) => ({ kind: 'payment', text: `${r.name} (Room ${r.room}) rent marked paid${r.rent ? ` · ₹${Number(r.rent).toLocaleString('en-IN')}` : ''}` }),
+}
+
 // newest first, at most `n`; each: { kind, text, at }
-export function recentActivities({ payments, checkins, checkouts, complaints }, n = 5) {
+export function recentActivities({ payments, checkins, checkouts, complaints, register = [] }, n = 5) {
   const room = (r) => (r ? ` · Room ${r}` : '')
   const list = [
+    ...register.filter((r) => REGISTER_EVENT[r.op]).map((r) => ({ ...REGISTER_EVENT[r.op](r), at: r.at })),
     ...payments.map((p) => ({ kind: 'payment', at: p.completed_at, text: `${p.profiles?.full_name ?? 'A tenant'} paid ₹${Number(p.amount).toLocaleString('en-IN')}` })),
     ...checkins.map((b) => ({ kind: 'checkin', at: b.check_in, text: `${b.profiles?.full_name ?? 'A tenant'} checked in${b.rooms?.room_no ? ` to Room ${b.rooms.room_no}` : ''}` })),
     ...checkouts.map((b) => ({ kind: 'vacant', at: b.actual_checkout, text: `${b.rooms?.room_no ? `Room ${b.rooms.room_no}` : 'A bed'} became vacant (${b.profiles?.full_name ?? 'tenant'} left)` })),
@@ -94,8 +104,9 @@ const inProperty = (pid, col = 'property_id') => (q) => (pid ? q.eq(col, pid) : 
 export async function loadAdminDashboard(pid, period = 0) {
   const { from, to } = monthRange(period)
   const today = ymd(new Date())
-  const [d, trend, expenses, outstanding, recurring, payslips, payments, checkins, checkouts, complaints] = await Promise.all([
+  const [d, reg, trend, expenses, outstanding, recurring, payslips, payments, checkins, checkouts, complaints] = await Promise.all([
     ownerDashboard(pid),
+    registerSummary(pid),
     rpc('report_trends', { p_property: pid || null, p_months: 6 }),
     rpc('report_expenses', { p_from: from, p_to: to, p_property: pid || null }),
     rpc('report_outstanding', { p_property: pid || null }),
@@ -113,8 +124,8 @@ export async function loadAdminDashboard(pid, period = 0) {
       (q) => inProperty(pid)(q.order('created_at', { ascending: false }).limit(5))),
   ])
   return {
-    d, trend: trend ?? [], breakdown: expenseBreakdown(expenses ?? []), rent: rentDue(outstanding ?? []),
+    d, reg: reg ?? EMPTY_SUMMARY, trend: trend ?? [], breakdown: expenseBreakdown(expenses ?? []), rent: rentDue(outstanding ?? []),
     bills: upcomingBills(recurring ?? [], payslips ?? []),
-    activities: recentActivities({ payments: payments ?? [], checkins: checkins ?? [], checkouts: checkouts ?? [], complaints: complaints ?? [] }),
+    activities: recentActivities({ payments: payments ?? [], checkins: checkins ?? [], checkouts: checkouts ?? [], complaints: complaints ?? [], register: reg?.recent ?? [] }),
   }
 }

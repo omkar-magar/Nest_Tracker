@@ -56,6 +56,15 @@ describe('dashboard helpers', () => {
     expect(dash.ago(list[0].at)).toBe('2 hours ago')
     expect(dash.ago(day(-1))).toBe('Yesterday')
   })
+  it('turns register changes into activity lines', () => {
+    const list = dash.recentActivities({ payments: [], checkins: [], checkouts: [], complaints: [], register: [
+      { op: 'INSERT', name: 'Asha', room: 'A-101', at: hoursAgo(3) },
+      { op: 'PAID', name: 'Asha', room: 'A-101', rent: 6500, at: hoursAgo(1) },
+      { op: 'CHECKOUT', name: 'Ben', room: 'B-204', at: hoursAgo(2) },
+    ] })
+    expect(list.map((a) => [a.kind, a.text])).toEqual([
+      ['payment', 'Asha (Room A-101) rent marked paid · ₹6,500'], ['vacant', 'Ben checked out of Room B-204'], ['checkin', 'Asha added to Room A-101']])
+  })
   it('counts tenants who owe rent and those already late', () => {
     expect(dash.rentDue([{ customer_id: 'a', days_overdue: 3 }, { customer_id: 'a', days_overdue: 0 }, { customer_id: 'b', days_overdue: 0 }]))
       .toEqual({ tenants: 2, overdueTenants: 1 })
@@ -72,6 +81,14 @@ describe('admin dashboard page', () => {
       complaints: { open: 4, overdue: 0 },
       properties: [{ id: 'P1', name: 'A wing', beds: 50, occupied: 42, occupancy_pct: 84, revenue: 185000, expenses: 62000, profit: 123000, pending: 18000, complaints_open: 4 }],
       upcoming_checkins: [], upcoming_checkouts: [{ date: day(3), name: 'Meera', room: '103', customer_id: 'c1' }, { date: day(30), name: 'Later', room: '104', customer_id: 'c2' }],
+    }, error: null }
+    db.rpcs.register_summary = { data: {
+      totals: { guests: 58, rooms_total: 30, rooms_occupied: 29, pg_rooms: 16, pg_people: 45, rented_rooms: 13, empty_rooms: 1,
+        occupancy_pct: 96.7, rent_roll: 500000, rent_pending: 27000, rent_pending_guests: 2, rent_partial_guests: 1, leaving_week: 1,
+        checkins_month: 2, checkouts_month: 1 },
+      properties: [{ id: 'P1', name: 'A wing', guests: 58, rooms_total: 30, rooms_occupied: 29, occupancy_pct: 96.7, pg_rooms: 16, rented_rooms: 13, empty_rooms: 1, rent_roll: 500000, rent_pending: 27000 }],
+      leaving: [{ id: 7, name: 'Kiran', room: 'A-305', date: day(2) }],
+      rent_pending: [], recent: [{ op: 'CHECKOUT', name: 'Sara', room: 'B-101', at: hoursAgo(1) }],
     }, error: null }
     db.rpcs.report_trends = { data: [
       { month: '2026-10-01', revenue: 171000, expenses: 59000, occupancy_pct: 82 },
@@ -94,8 +111,9 @@ describe('admin dashboard page', () => {
     const kpi = within(await screen.findByRole('region', { name: 'Key figures' }))
     expect(kpi.getByText('₹1,85,000')).toBeInTheDocument()
     expect(kpi.getByText('₹1,23,000')).toBeInTheDocument()
-    expect(kpi.getByText('₹18,000')).toBeInTheDocument()
-    expect(kpi.getByText('3 tenants · ₹6,000 overdue')).toBeInTheDocument()
+    // pending rent = app bills (₹18,000) + guest register (₹27,000)
+    expect(kpi.getByText('₹45,000')).toBeInTheDocument()
+    expect(kpi.getByText('3 guests (1 part paid) · 3 app tenants · ₹6,000 overdue')).toBeInTheDocument()
     expect(screen.getByText('↑ 8%', { exact: false })).toBeInTheDocument()
     expect(supabase.rpc).toHaveBeenCalledWith('report_trends', { p_property: null, p_months: 6 })
   })
@@ -116,11 +134,17 @@ describe('admin dashboard page', () => {
     expect(within(pie).getByText('Staff & salaries')).toBeInTheDocument()
     expect(within(pie).getByText('65%')).toBeInTheDocument()
     const alerts = screen.getByRole('region', { name: 'Quick alerts' })
-    expect(within(alerts).getByRole('link', { name: /Overdue rent.*2 tenants/ })).toHaveAttribute('href', '/admin/billing')
-    expect(within(alerts).getByText('1 tenant in 7 days')).toBeInTheDocument()
+    expect(within(alerts).getByRole('link', { name: /Rent pending.*5 guests · 2 overdue in billing/ })).toHaveAttribute('href', '/admin/register')
+    expect(within(alerts).getByText('2 guests in 7 days')).toBeInTheDocument()
     expect(within(alerts).getByText('4 requests')).toBeInTheDocument()
-    expect(screen.getByText('84%')).toBeInTheDocument()
-    expect(screen.getByText('+2 pts ↑ vs last month')).toBeInTheDocument()
+    // occupancy comes from the guest register (rooms); the app's bed board is a side note
+    const occ = screen.getByRole('region', { name: 'Occupancy overview' })
+    expect(within(occ).getByText('97%')).toBeInTheDocument()
+    expect(within(occ).getByText('58')).toBeInTheDocument()
+    expect(within(occ).getByText('29/30')).toBeInTheDocument()
+    expect(within(occ).getByText(/16 PG rooms \(45 sharing\) · 13 rented/)).toBeInTheDocument()
+    expect(within(occ).getByText(/42 of 50 beds booked in the app/)).toBeInTheDocument()
+    expect(screen.getByText('Sara checked out of Room B-101')).toBeInTheDocument()
     expect(screen.getByText('Rahul paid ₹8,000')).toBeInTheDocument()
     const bills = screen.getByRole('region', { name: 'Upcoming bills and payments' })
     expect(within(bills).getByText('Water')).toBeInTheDocument()
@@ -132,6 +156,19 @@ describe('admin dashboard page', () => {
     expect(within(actions).getByRole('link', { name: 'Raise maintenance' })).toHaveAttribute('href', '/admin/complaints?new=1')
     expect(within(actions).getByRole('link', { name: 'Add tenant' })).toHaveAttribute('href', '/admin/tenants?new=1')
     expect(screen.getByRole('heading', { name: 'Wing by wing' })).toBeInTheDocument()
+    expect(within(actions).getByRole('link', { name: 'Add guest' })).toHaveAttribute('href', '/admin/register')
+  })
+  it('puts register guests in the wing table and the check-out list', async () => {
+    open()
+    await screen.findByRole('heading', { name: 'Wing by wing' })
+    expect(screen.getByText('29/30 (96.7%)')).toBeInTheDocument()
+    expect(screen.getByText('16 · 13 · 1')).toBeInTheDocument()
+    const kiran = screen.getByText('Kiran')
+    const meera = screen.getByRole('link', { name: 'Meera' })
+    expect(meera).toHaveAttribute('href', '/admin/tenants/c1')
+    // register guest leaving in 2 days comes before the app tenant leaving in 3
+    expect(kiran.compareDocumentPosition(meera) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(kiran.closest('tr')).toHaveTextContent('Guest register')
   })
   it('switching to last month loads that month’s expenses', async () => {
     open()

@@ -28,6 +28,14 @@ beforeEach(() => {
     upcoming_checkins: [{ date: day(2), name: 'Ravi Kumar', bed: '101-A' }, { date: day(20), name: 'Later Guest', bed: '102-B' }],
     upcoming_checkouts: [{ date: day(3), name: 'Meera Shah', room: '103', customer_id: 'c1' }],
   }, error: null }
+  db.rpcs.register_summary = { data: {
+    totals: { guests: 68, rooms_total: 80, rooms_occupied: 36, occupancy_pct: 45, pg_rooms: 20, pg_people: 52, rented_rooms: 16,
+      empty_rooms: 44, rent_roll: 600000, rent_paid: 500000, rent_pending: 30000, rent_pending_guests: 9, rent_partial_guests: 3 },
+    properties: [{ id: 'P1', name: 'A wing' }, { id: 'P2', name: 'B wing' }],
+    leaving: [{ id: 5, name: 'Kiran Rao', room: 'A-305', date: day(1) }, { id: 6, name: 'Far Off', room: 'A-306', date: day(30) }],
+    rent_pending: [{ id: 9, property_id: 'P2', name: 'Sara Ali', room: 'B-101', rent: 7000, rent_status: 'partially_paid' }],
+    recent: [],
+  }, error: null }
 })
 
 describe('/staff picks a page by role and designation', () => {
@@ -76,13 +84,21 @@ describe('Manager page', () => {
     return render(<MemoryRouter><ManagerDashboard /></MemoryRouter>)
   }
 
-  it('shows beds, rent and only this week’s arrivals and departures', async () => {
+  it('shows register guests, rent pending and only this week’s arrivals and departures', async () => {
     open()
     await userEvent.click(screen.getByRole('tab', { name: 'Today' }))
     expect(await screen.findByText('Ravi Kumar')).toBeInTheDocument()
     expect(screen.getByText('Meera Shah')).toBeInTheDocument()
     expect(screen.queryByText('Later Guest')).not.toBeInTheDocument()
-    expect(screen.getByText('of 10 beds')).toBeInTheDocument()
+    expect(screen.getByText('Kiran Rao')).toBeInTheDocument()
+    expect(screen.queryByText('Far Off')).not.toBeInTheDocument()
+    expect(screen.getByText('36/80')).toBeInTheDocument()
+    expect(screen.getByText('₹42,000')).toBeInTheDocument()
+    expect(screen.getByText('12 guests')).toBeInTheDocument()
+    expect(screen.getByText('Sara Ali')).toBeInTheDocument()
+    expect(screen.getByText('B wing')).toBeInTheDocument()
+    expect(screen.getByText('Partially paid')).toBeInTheDocument()
+    expect(screen.getByText(/7 of 10 beds booked in the app/)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Full console' })).toHaveAttribute('href', '/admin')
   })
   it('Team shows who has checked in and lets the manager approve leave', async () => {

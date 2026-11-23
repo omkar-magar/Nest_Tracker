@@ -41,6 +41,25 @@ export const returnGuest = (id) => rpc('register_return', { p_id: id })
 export const removeEntry = (id) => deleteRow('register_guests', id)
 export const restoreHistory = (id) => rpc('register_restore', { p_history: id })
 
+// Figures for the dashboards (owner and managers only): per wing and grand total, who is leaving, whose rent is
+// pending, latest arrivals / departures. '' or null = every wing the login may see.
+export const EMPTY_SUMMARY = { totals: {}, properties: [], leaving: [], rent_pending: [], recent: [] }
+export const registerSummary = (pid) => rpc('register_summary', { p_property: pid || null })
+// the wing table: the bed / money row from owner_dashboard with that wing's register figures as `reg`
+export const withRegister = (properties = [], reg = EMPTY_SUMMARY) => {
+  const by = Object.fromEntries((reg.properties ?? []).map((p) => [p.id, p]))
+  const ids = new Set([...properties.map((p) => p.id), ...Object.keys(by)])
+  return [...ids].sort().map((id) => {
+    const p = properties.find((x) => x.id === id) ?? { id, name: by[id]?.name ?? id }
+    return { ...p, reg: by[id] ?? {} }
+  })
+}
+// app bookings leaving soon and register guests with an expected check-out, one list by date
+export const departures = (bookings = [], leaving = []) => [
+  ...bookings.map((b) => ({ ...b, id: `b${b.booking_id}`, source: 'app' })),
+  ...leaving.map((g) => ({ id: `g${g.id}`, name: g.name, room: g.room, date: g.date, source: 'register' })),
+].sort((a, b) => String(a.date).localeCompare(String(b.date)))
+
 // ---------------------------------------------------------------- values
 const NUMS = ['rent', 'deposit']
 const DATES = ['check_in', 'expected_checkout', 'checked_out_on']
