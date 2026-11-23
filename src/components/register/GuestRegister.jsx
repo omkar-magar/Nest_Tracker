@@ -197,8 +197,7 @@ function Current({ pid, list, setList, rooms, roomNos, canEdit, reload }) {
       {sum.totalRooms === 0 ? (
         <div className="mt-6"><Empty title="No rooms or guests yet">{canEdit ? 'Add the rooms under Properties & rooms, or import the old register under Import and AI link.' : 'Nothing has been added yet.'}</Empty></div>
       ) : view === 'table' ? (
-        <GuestTable rooms={shownRooms.filter((x) => x.shown.length || kindF === 'empty')} edit={canEdit && edit} canEdit={canEdit} roomNos={roomNos} onSaved={saved}
-          onAdd={(room) => setAdding({ room: room.room_no, after: room.guests.at(-1)?.id })} onCheckout={setLeaving} />
+        <GuestTable rooms={shownRooms.filter((x) => x.shown.length || kindF === 'empty')} edit={canEdit && edit} canEdit={canEdit} roomNos={roomNos} onSaved={saved} onCheckout={setLeaving} />
       ) : floors.map((f) => (
         <section key={f} className="mt-6">
           <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-600">{floorName(f)}</h3>
@@ -274,80 +273,122 @@ function GuestItem({ g, edit, canEdit, roomNos, onSaved, onCheckout }) {
   )
 }
 
-// Every guest as one row; a room's number and type span its guests' rows. Empty rooms only show when filtered for.
-// Amount and status share a cell so the table fits the page without scrolling sideways.
-const TH = ['Sr', 'Room', 'Type', 'Guest', 'Contact', 'Rent', 'Deposit', 'Check-in', 'Expected check-out', 'Notes']
+// Every guest as one compact row (room, type, name, contact, rent status, dates); a room's number and type span
+// its guests' rows. "Details" opens the rest under the row: every field, editable for owner / manager, and Check out.
+// Edit mode opens every row. Empty rooms only show when filtered for.
+const TH = ['Sr', 'Room', 'Type', 'Guest', 'Contact', 'Rent status', 'Check-in', 'Expected check-out']
 const td = 'px-3 py-2 align-top'
-// the Check out column stays in view when the table does scroll (phones, edit mode)
+// the Details column stays in view when the table scrolls sideways (phones)
 const STICKY = 'sticky right-0 whitespace-nowrap shadow-[-6px_0_6px_-6px_rgba(0,0,0,0.15)]'
 const shortKind = (room) => (room.kind === 'pg' ? `PG · ${room.people}` : room.kind === 'rented' ? 'Rented' : 'Empty')
 const money = (v) => (v === null || v === undefined ? '—' : rupees(v))
+const STATUS_OPTS = r.STATUSES.map((s) => [s, r.STATUS_TEXT[s]])
 
-function GuestTable({ rooms, edit, canEdit, roomNos, onSaved, onAdd, onCheckout }) {
+function GuestTable({ rooms, edit, canEdit, roomNos, onSaved, onCheckout }) {
+  const [open, setOpen] = useState(() => new Set())
+  const toggle = (id) => setOpen((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
+  const isOpen = (g) => edit || open.has(g.id)
   let sr = 0
-  const field = (g, k, label, props = {}) => <EditCell g={g} k={k} label={`${label}, ${g.name || 'unnamed entry'}`} bare onSaved={onSaved} {...props} />
-  const statusOpts = r.STATUSES.map((s) => [s, r.STATUS_TEXT[s]])
   if (!rooms.length) return <div className="mt-6"><Empty title="No guests match" /></div>
   return (
     <div className="mt-6 overflow-x-auto rounded-2xl border border-navy/10 bg-white">
-      <table className={`w-full text-left text-sm ${edit ? 'min-w-[80rem]' : 'min-w-[56rem]'}`}>
+      <table className="w-full min-w-[50rem] text-left text-sm">
         <caption className="sr-only">Guest register</caption>
         <thead className="border-b border-navy/10 bg-cream text-xs uppercase tracking-wide text-slate-500">
-          <tr>{TH.map((h) => <th key={h} scope="col" className="whitespace-nowrap px-3 py-2.5 font-semibold">{h}</th>)}{canEdit && <th scope="col" className={`${STICKY} bg-cream px-3 py-2.5`}><span className="sr-only">Actions</span></th>}</tr>
+          <tr>{TH.map((h) => <th key={h} scope="col" className="whitespace-nowrap px-3 py-2.5 font-semibold">{h}</th>)}<th scope="col" className={`${STICKY} bg-cream px-3 py-2.5`}><span className="sr-only">Details</span></th></tr>
         </thead>
         {rooms.map((room) => {
           const rows = room.shown.length ? room.shown : [null]
+          // the room and type cells also span the open detail rows
+          const span = rows.length + rows.filter((g) => g && isOpen(g)).length
           return (
             <tbody key={room.room_no} className="border-b border-navy/10 last:border-0">
               {rows.map((g, i) => (
-                <tr key={g?.id ?? 'empty'} className="border-t border-navy/5 first:border-0">
-                  <td className={`${td} text-slate-500`}>{g ? ++sr : ''}</td>
-                  {i === 0 && (
-                    <>
-                      <th scope="rowgroup" rowSpan={rows.length} className={`${td} whitespace-nowrap font-semibold`}>
-                        {room.room_no}
-                        {canEdit && <button aria-label={`Add guest to room ${room.room_no}`} onClick={() => onAdd(room)}
-                          className="ml-2 rounded-full border border-navy/30 px-2 text-sm font-semibold hover:bg-navy/5 focus-visible:outline-2 focus-visible:outline-navy">+</button>}
-                      </th>
-                      <td rowSpan={rows.length} className={`${td} whitespace-nowrap`}><Badge tone={KIND_TONE[room.kind]}>{shortKind(room)}</Badge></td>
-                    </>
-                  )}
-                  {!g ? <td colSpan={TH.length - 3 + (canEdit ? 1 : 0)} className={`${td} italic text-slate-500`}>No guest</td> : edit ? (
-                    <>
-                      <td className={td}>{field(g, 'name', 'Guest name')}</td>
-                      <td className={td}>{field(g, 'contact', 'Contact', { type: 'tel' })}</td>
-                      <td className={`${td} space-y-1`}>{field(g, 'rent', 'Rent', { type: 'number' })}{field(g, 'rent_status', 'Rent status', { options: statusOpts })}</td>
-                      <td className={`${td} space-y-1`}>{field(g, 'deposit', 'Deposit', { type: 'number' })}{field(g, 'deposit_status', 'Deposit status', { options: statusOpts })}</td>
-                      <td className={td}>{field(g, 'check_in', 'Check-in', { type: 'date' })}</td>
-                      <td className={td}>{field(g, 'expected_checkout', 'Expected check-out', { type: 'date' })}</td>
-                      <td className={td}>{field(g, 'notes', 'Notes')}</td>
-                      <td className={`${td} ${STICKY} bg-white`}>
-                        {field(g, 'room_no', 'Room', { options: roomNos.length ? roomNos.map((n) => [n, n]) : null })}
-                        <Button variant="danger" className="mt-1 !px-3 !py-1 text-xs" onClick={() => onCheckout(g)}>{r.occupies(g) ? 'Check out' : 'Remove'}</Button>
-                      </td>
-                    </>
-                  ) : (
-                    <>
-                      <td className={`${td} font-medium`}>
-                        {g.name || <span className="italic text-slate-500">Unnamed entry</span>}
-                        {r.leavingSoon(g) && <span className="mt-1 block"><Badge tone="amber">Leaving soon</Badge></span>}
-                      </td>
-                      <td className={`${td} whitespace-nowrap`}>{g.contact ? <a href={`tel:${g.contact}`} className="underline focus-visible:outline-2 focus-visible:outline-navy">{g.contact}</a> : '—'}</td>
-                      <td className={`${td} whitespace-nowrap`}>{money(g.rent)}<span className="mt-1 block"><StatusPill value={g.rent_status} /></span></td>
-                      <td className={`${td} whitespace-nowrap`}>{money(g.deposit)}<span className="mt-1 block"><StatusPill value={g.deposit_status} /></span></td>
-                      <td className={`${td} whitespace-nowrap`}>{g.check_in ? formatDate(g.check_in) : '—'}</td>
-                      <td className={`${td} whitespace-nowrap`}>{g.expected_checkout ? formatDate(g.expected_checkout) : '—'}</td>
-                      <td className={`${td} min-w-[10rem] text-slate-600`}><span className="line-clamp-2 break-words" title={g.notes || undefined}>{g.notes || ''}</span></td>
-                      {canEdit && <td className={`${td} ${STICKY} bg-white`}><Button variant="outline" className="!px-3 !py-1 text-xs" onClick={() => onCheckout(g)}>{r.occupies(g) ? 'Check out' : 'Remove'}</Button></td>}
-                    </>
-                  )}
-                </tr>
+                <GuestRows key={g?.id ?? 'empty'} g={g} sr={g ? ++sr : ''} first={i === 0} room={room} span={span}
+                  open={g ? isOpen(g) : false} onToggle={() => toggle(g.id)} edit={edit}
+                  canEdit={canEdit} roomNos={roomNos} onSaved={onSaved} onCheckout={onCheckout} />
               ))}
             </tbody>
           )
         })}
       </table>
     </div>
+  )
+}
+
+function GuestRows({ g, sr, first, room, span, open, onToggle, edit, canEdit, roomNos, onSaved, onCheckout }) {
+  const roomCells = first && (
+    <>
+      <th scope="rowgroup" rowSpan={span} className={`${td} whitespace-nowrap font-semibold`}>{room.room_no}</th>
+      <td rowSpan={span} className={`${td} whitespace-nowrap`}><Badge tone={KIND_TONE[room.kind]}>{shortKind(room)}</Badge></td>
+    </>
+  )
+  if (!g) {
+    return (
+      <tr className="border-t border-navy/5 first:border-0">
+        <td className={td} />{roomCells}
+        <td colSpan={TH.length - 2} className={`${td} italic text-slate-500`}>No guest</td>
+      </tr>
+    )
+  }
+  const detailsId = `g${g.id}-details`
+  const who = g.name || 'unnamed entry'
+  return (
+    <>
+      <tr className={`border-t border-navy/5 first:border-0 ${open ? 'bg-cream/50' : ''}`}>
+        <td className={`${td} text-slate-500`}>{sr}</td>
+        {roomCells}
+        <td className={`${td} font-medium`}>
+          {g.name || <span className="italic text-slate-500">Unnamed entry</span>}
+          {r.leavingSoon(g) && <span className="mt-1 block"><Badge tone="amber">Leaving soon</Badge></span>}
+        </td>
+        <td className={`${td} whitespace-nowrap`}>{g.contact ? <a href={`tel:${g.contact}`} className="underline focus-visible:outline-2 focus-visible:outline-navy">{g.contact}</a> : '—'}</td>
+        <td className={`${td} whitespace-nowrap`}><StatusPill value={g.rent_status} /></td>
+        <td className={`${td} whitespace-nowrap`}>{g.check_in ? formatDate(g.check_in) : '—'}</td>
+        <td className={`${td} whitespace-nowrap`}>{g.expected_checkout ? formatDate(g.expected_checkout) : '—'}</td>
+        <td className={`${td} ${STICKY} ${open ? 'bg-cream' : 'bg-white'}`}>
+          {!edit && (
+            <button type="button" aria-expanded={open} aria-controls={detailsId} aria-label={`${open ? 'Hide' : 'Show'} details, ${who}`} onClick={onToggle}
+              className="rounded-full border border-navy/30 px-3 py-1 text-xs font-semibold text-navy hover:bg-navy/5 focus-visible:outline-2 focus-visible:outline-navy">
+              Details <span aria-hidden="true">{open ? '▴' : '▾'}</span>
+            </button>
+          )}
+        </td>
+      </tr>
+      {open && (
+        <tr id={detailsId} className="bg-cream/50">
+          <td className={td} />
+          <td colSpan={TH.length - 2} className={`${td} pb-4`}>
+            {canEdit ? (
+              <>
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                  <EditCell g={g} k="name" label="Guest name" onSaved={onSaved} />
+                  <EditCell g={g} k="contact" label="Contact" type="tel" onSaved={onSaved} />
+                  <EditCell g={g} k="room_no" label="Room" options={roomNos.length ? roomNos.map((n) => [n, n]) : null} onSaved={onSaved} />
+                  <EditCell g={g} k="rent" label="Rent (₹)" type="number" onSaved={onSaved} />
+                  <EditCell g={g} k="rent_status" label="Rent status" options={STATUS_OPTS} onSaved={onSaved} />
+                  <EditCell g={g} k="deposit" label="Deposit (₹)" type="number" onSaved={onSaved} />
+                  <EditCell g={g} k="deposit_status" label="Deposit status" options={STATUS_OPTS} onSaved={onSaved} />
+                  <EditCell g={g} k="check_in" label="Check-in" type="date" onSaved={onSaved} />
+                  <EditCell g={g} k="expected_checkout" label="Expected check-out" type="date" onSaved={onSaved} />
+                  <div className="sm:col-span-2 lg:col-span-3"><EditCell g={g} k="notes" label="Notes" onSaved={onSaved} /></div>
+                </div>
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs text-slate-600">Changes save as you leave each field.</p>
+                  <Button variant="danger" className="!px-3 !py-1 text-xs" onClick={() => onCheckout(g)}>{r.occupies(g) ? 'Check out' : 'Remove'}</Button>
+                </div>
+              </>
+            ) : (
+              <dl className="grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-4">
+                <div><dt className="text-xs text-slate-500">Rent</dt><dd>{money(g.rent)} <StatusPill value={g.rent_status} /></dd></div>
+                <div><dt className="text-xs text-slate-500">Deposit</dt><dd>{money(g.deposit)} <StatusPill value={g.deposit_status} /></dd></div>
+                <div className="col-span-2"><dt className="text-xs text-slate-500">Notes</dt><dd className="break-words">{g.notes || '—'}</dd></div>
+              </dl>
+            )}
+          </td>
+        </tr>
+      )}
+    </>
   )
 }
 
