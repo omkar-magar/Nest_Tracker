@@ -73,45 +73,25 @@ describe('Login', () => {
     at('employee')
     expect(screen.queryByRole('link', { name: 'Create an account' })).not.toBeInTheDocument()
   })
-  it('asks customers for a phone number and staff for a username', () => {
-    const { unmount } = at('customer')
-    expect(screen.getByLabelText('Phone number')).toHaveAttribute('type', 'tel')
-    unmount()
-    at('admin')
-    expect(screen.getByLabelText('Username')).toBeRequired()
-    expect(screen.queryByLabelText('Email')).not.toBeInTheDocument()
-  })
-  it('has labelled, required phone and password fields', () => {
+  it('has labelled, required email and password fields', () => {
     at()
-    expect(screen.getByLabelText('Phone number')).toBeRequired()
+    expect(screen.getByLabelText('Email')).toBeRequired()
+    expect(screen.getByLabelText('Email')).toHaveAttribute('type', 'email')
     expect(screen.getByLabelText('Password')).toBeRequired()
     expect(screen.getByLabelText('Password')).toHaveAttribute('type', 'password')
   })
-  it('looks up the login email from the phone and signs in with it', async () => {
+  it('submits the trimmed email and the password', async () => {
     const auth = setAuth()
-    db.rpcs.login_email = { data: 'asha@example.com', error: null }
     at()
-    await userEvent.type(screen.getByLabelText('Phone number'), '  9876543210 ')
+    await userEvent.type(screen.getByLabelText('Email'), '  asha@example.com ')
     await userEvent.type(screen.getByLabelText('Password'), 'secret123')
     await userEvent.click(screen.getByRole('button', { name: 'Log in' }))
-    expect(supabase.rpc).toHaveBeenCalledWith('login_email', { p_identifier: '9876543210', p_staff: false })
     expect(auth.signIn).toHaveBeenCalledWith('asha@example.com', 'secret123')
   })
-  it('rejects an unknown username without signing in', async () => {
-    const auth = setAuth()
-    db.rpcs.login_email = { data: null, error: null }
-    at('admin')
-    await userEvent.type(screen.getByLabelText('Username'), 'nobody')
-    await userEvent.type(screen.getByLabelText('Password'), 'secret123')
-    await userEvent.click(screen.getByRole('button', { name: 'Log in' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('Invalid login credentials')
-    expect(auth.signIn).not.toHaveBeenCalled()
-  })
   it('shows the error returned by Supabase', async () => {
-    db.rpcs.login_email = { data: 'a@b.c', error: null }
     setAuth({ signIn: vi.fn(async () => ({ error: { message: 'Invalid login credentials' } })) })
     at()
-    await userEvent.type(screen.getByLabelText('Phone number'), '9876543210')
+    await userEvent.type(screen.getByLabelText('Email'), 'a@b.c')
     await userEvent.type(screen.getByLabelText('Password'), 'wrongpass')
     await userEvent.click(screen.getByRole('button', { name: 'Log in' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Invalid login credentials')
@@ -119,10 +99,9 @@ describe('Login', () => {
   })
   it('disables the button while signing in', async () => {
     let done
-    db.rpcs.login_email = { data: 'a@b.c', error: null }
     setAuth({ signIn: vi.fn(() => new Promise((r) => { done = r })) })
     at()
-    await userEvent.type(screen.getByLabelText('Phone number'), '9876543210')
+    await userEvent.type(screen.getByLabelText('Email'), 'a@b.c')
     await userEvent.type(screen.getByLabelText('Password'), 'secret123')
     await userEvent.click(screen.getByRole('button', { name: 'Log in' }))
     expect(screen.getByRole('button', { name: 'Signing in…' })).toBeDisabled()

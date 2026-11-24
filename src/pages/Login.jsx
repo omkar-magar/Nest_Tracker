@@ -48,12 +48,7 @@ export default function Login({ audience = 'customer' }) {
     e.preventDefault()
     setBusy(true)
     setError('')
-    const { data: authEmail, error: lookupError } = await supabase.rpc('login_email', { p_identifier: email.trim(), p_staff: audience !== 'customer' })
-    if (lookupError || !authEmail) {
-      setBusy(false)
-      return setError('Invalid login credentials')
-    }
-    const { error } = await signIn(authEmail, password)
+    const { error } = await signIn(email.trim(), password)
     setBusy(false)
     if (error) setError(error.message)
   }
@@ -75,10 +70,8 @@ export default function Login({ audience = 'customer' }) {
         </Card>
       ) : otp ? <OtpLogin onBack={() => setOtp(false)} /> : (
         <form onSubmit={submit} className="mt-6 space-y-4 rounded-2xl border border-navy/10 bg-white p-5">
-          <Field label={audience === 'customer' ? 'Phone number' : 'Username'}>
-            {audience === 'customer'
-              ? <input className={inputCls} type="tel" inputMode="tel" autoComplete="tel" required value={email} onChange={(e) => setEmail(e.target.value)} />
-              : <input className={inputCls} autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} />}
+          <Field label="Email">
+            <input className={inputCls} type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
           </Field>
           <Field label="Password">
             <input className={inputCls} type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
@@ -130,7 +123,7 @@ function OtpLogin({ onBack }) {
       )}
       {state.error && <p role="alert" className="text-sm text-red-700">{state.error}</p>}
       <Button type="submit" className="w-full" disabled={state.busy}>{state.busy ? 'Please wait…' : sent ? 'Verify and log in' : 'Send code'}</Button>
-      <button type="button" className="text-sm font-medium underline" onClick={onBack}>Use password instead</button>
+      <button type="button" className="text-sm font-medium underline" onClick={onBack}>Use email and password</button>
     </form>
   )
 }
