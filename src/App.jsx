@@ -3,6 +3,7 @@ import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
 import QuickContactBar from './components/QuickContactBar'
+import WhatsAppLeadModal from './components/WhatsAppLeadModal'
 import FloatingShortcuts from './components/FloatingShortcuts'
 import RequireRole from './components/RequireRole'
 import { Button, Spinner } from './components/ui'
@@ -77,6 +78,7 @@ function PublicLayout() {
       <Footer />
       <QuickContactBar />
       <FloatingShortcuts />
+      <WhatsAppLeadModal />
     </div>
   )
 }

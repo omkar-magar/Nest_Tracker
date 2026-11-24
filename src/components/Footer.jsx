@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { brand } from '../data/site'
-import { whatsappUrl } from '../services/contact'
+import { askBeforeWhatsApp, whatsappUrl } from '../services/contact'
 
 const col = 'text-sm text-white/75 hover:text-white'
 
@@ -38,7 +38,7 @@ export default function Footer() {
           <h2 className="text-sm font-semibold uppercase tracking-wide text-gold">Contact</h2>
           <ul className="mt-3 space-y-2 text-sm text-white/75">
             <li><a className={col} href={`tel:+91${brand.phone}`}>{brand.phone}</a></li>
-            <li><a className={col} href={whatsappUrl()} target="_blank" rel="noreferrer">WhatsApp us</a></li>
+            <li><a className={col} href={whatsappUrl()} onClick={askBeforeWhatsApp} target="_blank" rel="noreferrer">WhatsApp us</a></li>
             <li>{brand.address}</li>
           </ul>
           {brand.social.length > 0 && (

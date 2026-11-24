@@ -7,7 +7,7 @@ import useCatalog from '../hooks/useCatalog'
 import { previewRooms } from '../services/catalog'
 import VisitForm from '../components/VisitForm'
 import { brand, highlights } from '../data/site'
-import { whatsappUrl } from '../services/contact'
+import { askBeforeWhatsApp, whatsappUrl } from '../services/contact'
 
 function RoomPreview() {
   const { data, error, loading, reload } = useCatalog()
@@ -65,7 +65,7 @@ export default function Home() {
             <p className="mb-4 mt-1 text-slate-600">{brand.address}</p>
             <div className="flex flex-col gap-3 sm:flex-row lg:flex-col xl:flex-row">
               <Button variant="primary" className="px-6 py-3" href={`tel:+91${brand.phone}`}>Call {brand.phone}</Button>
-              <Button variant="outline" className="px-6 py-3" href={whatsappUrl()} target="_blank" rel="noreferrer">WhatsApp us</Button>
+              <Button variant="outline" className="px-6 py-3" href={whatsappUrl()} onClick={askBeforeWhatsApp} target="_blank" rel="noreferrer">WhatsApp us</Button>
             </div>
           </div>
         </div>
