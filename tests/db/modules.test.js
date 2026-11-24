@@ -157,21 +157,6 @@ describe('enquiries and sales (PRD 8-9)', () => {
     expect((await one('select stay_duration from public.tenant_profiles where user_id = $1', [rita])).stay_duration).toBe('1 year')
   })
 
-  it('new registration: pending, alerts owner and managers, any manager can approve it', async () => {
-    const neha = await makeUser(db, 'customer', 'Neha')
-    await as(db, neha, ({ q }) => q('select public.save_my_tenant_profile($1)', [emergency]))
-    expect((await one('select approval_status from public.tenant_profiles where user_id = $1', [neha])).approval_status).toBe('pending')
-    for (const u of [owner, manager, otherManager]) {
-      const n = await one("select link from public.notifications where kind = 'registration' and user_id = $1 and entity_id = $2 and channel = 'in_app'", [u, neha])
-      expect(n.link).toBe('/admin/registrations')
-    }
-    // a manager of another wing sees the unassigned registration and approves it
-    const seen = await as(db, otherManager, ({ q }) => q('select user_id from public.tenant_profiles where user_id = $1', [neha]))
-    expect(seen.rows ?? seen).toHaveLength(1)
-    await as(db, otherManager, ({ q }) => q("select public.set_tenant_approval($1, 'approved', '')", [neha]))
-    expect((await one('select approval_status from public.tenant_profiles where user_id = $1', [neha])).approval_status).toBe('approved')
-  })
-
   it('converts a lead on check-in and pays out broker commission and referral reward', async () => {
     const broker = await as(db, manager, ({ one: o }) => o(
       "insert into public.brokers (name, commission_type, commission_value) values ('Pune Homes', 'percent', 50) returning id"))

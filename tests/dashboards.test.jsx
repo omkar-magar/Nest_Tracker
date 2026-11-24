@@ -49,19 +49,6 @@ describe('Account page', () => {
     open()
     expect(await screen.findByRole('heading', { level: 1, name: 'Hi Test User' })).toBeInTheDocument()
   })
-  it('shows only a waiting message until the manager approves the registration', async () => {
-    seed({ bookings: [] })
-    db.tables.tenant_profiles = { data: { approval_status: 'pending', approval_note: '' }, error: null }
-    open()
-    expect(await screen.findByText('Waiting for manager’s approval')).toBeInTheDocument()
-    expect(screen.queryByText('Amount paid')).not.toBeInTheDocument()
-  })
-  it('opens the dashboard once the registration is approved', async () => {
-    seed({ bookings: [] })
-    db.tables.tenant_profiles = { data: { approval_status: 'approved', approval_note: '' }, error: null }
-    open()
-    expect(await screen.findByText('Amount paid')).toBeInTheDocument()
-  })
   it('shows a confirmation after booking', async () => {
     seed()
     open({ justBooked: true })

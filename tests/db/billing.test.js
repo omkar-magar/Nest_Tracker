@@ -72,7 +72,7 @@ describe('property and beds', () => {
   })
 
   it('hides other properties\' stays from a manager', async () => {
-    const rows = (await as(db, otherManager, ({ q }) => q('select * from public.tenant_profiles'))).filter((r) => r.property_id) // unassigned new registrations are visible to every manager
+    const rows = await as(db, otherManager, ({ q }) => q('select * from public.tenant_profiles'))
     expect(rows).toEqual([])
   })
 })

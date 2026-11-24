@@ -32,8 +32,8 @@ export default function Signup() {
     if (bad) return setError(bad)
     setBusy(true)
     try {
-      await sendOtp(form.phone)
-      setOtpModal({})
+      const { demoCode } = await sendOtp(form.phone)
+      setOtpModal({ demoCode })
     } catch (err) {
       setError(err.message || 'Could not send the OTP')
     }
@@ -76,15 +76,16 @@ export default function Signup() {
         <p className="text-center text-xs text-slate-500">By signing up you accept our <Link className="underline" to="/terms">terms</Link> and <Link className="underline" to="/privacy">privacy policy</Link>.</p>
         <p className="text-center text-sm text-slate-600">Already have an account? <Link className="font-medium underline" to="/login">Log in</Link></p>
       </form>
-      {otpModal && <OtpModal phone={form.phone} needsConfirm={needsConfirm} onCreate={createAccount} onClose={closeModal} />}
+      {otpModal && <OtpModal phone={form.phone} demoCode={otpModal.demoCode} needsConfirm={needsConfirm} onCreate={createAccount} onClose={closeModal} />}
     </div>
   )
 }
 
 // Popup: enter the OTP; when it is right the account is created and the popup says so.
-function OtpModal({ phone, needsConfirm, onCreate, onClose }) {
+function OtpModal({ phone, demoCode, needsConfirm, onCreate, onClose }) {
   const [code, setCode] = useState('')
   const [state, setState] = useState({ busy: false, error: '', done: false })
+  const [shownCode, setShownCode] = useState(demoCode)
 
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && !state.done && onClose()
@@ -100,7 +101,8 @@ function OtpModal({ phone, needsConfirm, onCreate, onClose }) {
     setState(error ? { busy: false, error, done: false } : { busy: false, error: '', done: true })
   }
   const resend = async () => {
-    await sendOtp(phone)
+    const r = await sendOtp(phone)
+    setShownCode(r.demoCode)
     setCode('')
     setState({ busy: false, error: '', done: false })
   }
@@ -113,7 +115,7 @@ function OtpModal({ phone, needsConfirm, onCreate, onClose }) {
           <div className="text-center">
             <h2 id="otp-title" className="text-2xl font-bold text-gold-deep">Account has been created</h2>
             <p className="mt-2 text-sm text-slate-700">
-              {needsConfirm ? 'Check your email to confirm your account, then log in. Your registration form is kept and will be ready to submit.' : 'Your registration has been sent to the manager. Your dashboard unlocks once they approve it.'}
+              {needsConfirm ? 'Check your email to confirm your account, then log in. Your registration form is kept and will be ready to submit.' : 'Welcome to YOLO Nest Co-Living.'}
             </p>
             <Button to={needsConfirm ? '/login' : '/account'} className="mt-5 w-full">{needsConfirm ? 'Go to log in' : 'Go to my account'}</Button>
           </div>
@@ -121,11 +123,11 @@ function OtpModal({ phone, needsConfirm, onCreate, onClose }) {
           <form onSubmit={verify} className="space-y-4">
             <div>
               <h2 id="otp-title" className="text-2xl font-bold text-gold-deep">Verify your mobile number</h2>
-              <p className="mt-1 text-sm text-slate-700">Enter the OTP sent to {phone}.</p>
-              <p className="mt-1 text-xs text-slate-600">Demo mode: any code works.</p>
+              <p className="mt-1 text-sm text-slate-700">Enter the 6-digit OTP sent to {phone}.</p>
+              {shownCode && <p className="mt-1 text-xs text-slate-600">Demo mode: your OTP is <strong>{shownCode}</strong></p>}
             </div>
             <Field label="OTP">
-              <input className={inputCls} inputMode="numeric" autoComplete="one-time-code" required autoFocus maxLength={6} value={code} onChange={(e) => setCode(e.target.value)} />
+              <input className={inputCls} inputMode="numeric" autoComplete="one-time-code" required autoFocus pattern="[0-9]{6}" maxLength={6} value={code} onChange={(e) => setCode(e.target.value)} />
             </Field>
             {state.error && <p role="alert" className="text-sm text-red-700">{state.error}</p>}
             <Button type="submit" className="w-full" disabled={state.busy}>{state.busy ? 'Verifying…' : 'Verify OTP'}</Button>

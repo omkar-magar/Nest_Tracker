@@ -148,8 +148,8 @@ describe('Signup', () => {
   const at = () => renderRoute(<Signup />, { path: '/signup' })
   const verifyWithOtp = async (code) => {
     await userEvent.click(screen.getByRole('button', { name: 'Send OTP' }))
-    await screen.findByRole('dialog')
-    await userEvent.type(screen.getByLabelText('OTP'), code ?? '123456')
+    const dialog = await screen.findByRole('dialog')
+    await userEvent.type(screen.getByLabelText('OTP'), code ?? dialog.querySelector('strong').textContent)
     await userEvent.click(screen.getByRole('button', { name: 'Verify OTP' }))
   }
   const fill = async ({ name = ' Asha Rao ', phone = '9876543210', email = ' asha@example.com ', password = 'secret123', rules = true } = {}) => {
@@ -211,13 +211,13 @@ describe('Signup', () => {
     expect(screen.getByText(/Check your email to confirm your account/)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Go to log in' })).toHaveAttribute('href', '/login')
   })
-  it('accepts any OTP in demo mode', async () => {
+  it('does not create the account when the OTP is wrong', async () => {
     const auth = setAuth()
     at()
     await fill()
-    await verifyWithOtp('1')
-    expect(await screen.findByText('Account has been created')).toBeInTheDocument()
-    expect(auth.signUp).toHaveBeenCalled()
+    await verifyWithOtp('000000')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Incorrect OTP')
+    expect(auth.signUp).not.toHaveBeenCalled()
   })
   it('shows the sign-up error (e.g. email already registered)', async () => {
     setAuth({ signUp: vi.fn(async () => ({ data: null, error: { message: 'User already registered' } })) })

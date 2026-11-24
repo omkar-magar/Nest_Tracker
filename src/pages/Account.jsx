@@ -144,7 +144,7 @@ function ProfileForm({ profile, onSaved }) {
 const H2 = ({ children, id }) => <h2 id={id} className="mb-3 mt-10 scroll-mt-16 text-xl font-bold">{children}</h2>
 
 export default function Account() {
-  const { user, profile, refreshProfile, signOut } = useAuth()
+  const { user, profile, refreshProfile } = useAuth()
   const { state } = useLocation()
   const { data, error, loading, reload } = useAsync(() => loadMyAccount(user.id), [user.id])
   const [paying, setPaying] = useState(null)
@@ -170,23 +170,6 @@ export default function Account() {
   if (error) return <div className="mx-auto max-w-3xl px-4 py-10"><ErrorBox error={error} onRetry={reload} /></div>
 
   const live = data.bookings.find((b) => b.status === 'active' || b.status === 'pending')
-  // a new registration waits for the manager before the dashboard opens
-  const approval = Array.isArray(data.approval) ? null : data.approval
-  if (!live && ['pending', 'rejected'].includes(approval?.approval_status)) {
-    const rejected = approval.approval_status === 'rejected'
-    return (
-      <div className="mx-auto w-full max-w-xl px-4 py-16 text-center text-navy">
-        <h1 className="text-2xl font-bold">Hi {profile?.full_name || 'there'}</h1>
-        <div className="mt-6"><Notice tone={rejected ? 'warn' : 'ok'}>
-          <p role="status" className="font-semibold">{rejected ? 'Your registration needs attention' : 'Waiting for manager’s approval'}</p>
-          <p className="mt-1 text-sm">{rejected
-            ? `${approval.approval_note || 'Please contact the office.'}`
-            : 'Your registration form has been sent. Your dashboard opens as soon as the manager approves it. We will notify you.'}</p>
-        </Notice></div>
-        <Button variant="outline" className="mt-6" onClick={signOut}>Log out</Button>
-      </div>
-    )
-  }
   const past = data.bookings.filter((b) => b !== live)
   const sum = summarize(data.bills, data.payments)
   const hasStay = data.bookings.some((b) => ['active', 'completed'].includes(b.status))

@@ -36,7 +36,6 @@ const Properties = lazy(() => import('./pages/manage/Properties'))
 const Beds = lazy(() => import('./pages/manage/Beds'))
 const Tenants = lazy(() => import('./pages/manage/Tenants'))
 const Register = lazy(() => import('./pages/manage/Register'))
-const Registrations = lazy(() => import('./pages/manage/Registrations'))
 const TenantDetail = lazy(() => import('./pages/manage/TenantDetail'))
 const CheckIn = lazy(() => import('./pages/manage/CheckIn'))
 const Billing = lazy(() => import('./pages/manage/Billing'))
@@ -135,7 +134,6 @@ export default function App() {
             <Route index element={<ManageHome />} />
             <Route path="beds" element={<Beds />} />
             <Route path="register" element={only(MANAGE, <Register />)} />
-            <Route path="registrations" element={only(MANAGE, <Registrations />)} />
             <Route path="tenants" element={only(MANAGE, <Tenants />)} />
             <Route path="tenants/:id" element={only(MANAGE, <TenantDetail />)} />
             <Route path="checkin" element={only(MANAGE, <CheckIn />)} />

@@ -20,14 +20,13 @@ export const bookRoom = ({ roomId, bedCount, checkIn, checkOut }) =>
 export const cancelBooking = (id) => supabase.rpc('cancel_booking', { p_booking_id: id }).then(unwrap).then(freshCatalog)
 
 export async function loadMyAccount(userId) {
-  const [bookings, bills, payments, documents, review, tenant] = await Promise.all([
+  const [bookings, bills, payments, documents, review] = await Promise.all([
     supabase.from('bookings').select('*, rooms(wing, room_no, floor, ac_type, category_id), booking_beds(active, beds(label))')
       .eq('customer_id', userId).order('created_at', { ascending: false }),
     supabase.from('bills').select('*').eq('customer_id', userId).order('due_date'),
     supabase.from('payments').select('*, bills(description)').eq('customer_id', userId).order('created_at', { ascending: false }),
     supabase.from('customer_documents').select('*').eq('customer_id', userId).order('created_at', { ascending: false }),
     supabase.from('reviews').select('*').eq('customer_id', userId).maybeSingle(),
-    supabase.from('tenant_profiles').select('approval_status, approval_note').eq('user_id', userId).maybeSingle(),
   ])
   return {
     bookings: unwrap(bookings),
@@ -35,7 +34,6 @@ export async function loadMyAccount(userId) {
     payments: unwrap(payments),
     documents: unwrap(documents),
     review: unwrap(review),
-    approval: unwrap(tenant),
   }
 }
 
