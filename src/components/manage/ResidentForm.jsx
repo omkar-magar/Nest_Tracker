@@ -1,6 +1,5 @@
 import { FormFields } from './kit'
 import { RULES, TENANT_SECTIONS } from './tenantFields'
-import { Field, inputCls } from '../ui'
 
 // The paper Resident Registration Form on screen: sections 1-5, then the rules (6) with the sign-off.
 // `skip` hides fields the page already asks elsewhere (e.g. name and phone on the account page).
@@ -27,9 +26,6 @@ export default function ResidentForm({ value, onChange, skip = [], signed = fals
               <input type="checkbox" className="mt-0.5 h-4 w-4 accent-navy" checked={Boolean(value.rules_accepted)} onChange={(e) => onChange({ ...value, rules_accepted: e.target.checked })} />
               I have read, understood, and agree to comply with all the above rules &amp; regulations.
             </label>
-            <Field label="Resident signature (type your full name)">
-              <input className={inputCls} value={value.rules_signature ?? ''} onChange={(e) => onChange({ ...value, rules_signature: e.target.value })} />
-            </Field>
           </div>
         )}
       </section>
