@@ -38,8 +38,9 @@ describe('loadMyAccount', () => {
     db.tables.payments = { data: [{ id: 'p' }], error: null }
     db.tables.customer_documents = { data: [], error: null }
     db.tables.reviews = { data: null, error: null }
+    db.tables.tenant_profiles = { data: { approval_status: 'pending' }, error: null }
     const out = await api.loadMyAccount('u1')
-    expect(out).toEqual({ bookings: [{ id: 'b' }], bills: [{ id: 'bill' }], payments: [{ id: 'p' }], documents: [], review: null })
+    expect(out).toEqual({ bookings: [{ id: 'b' }], bills: [{ id: 'bill' }], payments: [{ id: 'p' }], documents: [], review: null, approval: { approval_status: 'pending' } })
     for (const t of ['bookings', 'bills', 'payments', 'customer_documents', 'reviews']) {
       expect(queryFor(t)[0].ops).toContainEqual(['eq', ['customer_id', 'u1']])
     }

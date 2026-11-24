@@ -12,6 +12,7 @@ import { loadProperties, loadStartProperty, runJobs } from '../../services/manag
 export const MODULES = [
   ['', 'Dashboard', ['admin', 'manager']],
   ['beds', 'Beds', ['admin', 'manager', 'sales']],
+  ['registrations', 'New registrations', ['admin', 'manager']],
   ['register', 'Guest register', ['admin', 'manager']],
   ['tenants', 'Tenants', ['admin', 'manager']],
   ['billing', 'Rent & payments', ['admin', 'manager']],
