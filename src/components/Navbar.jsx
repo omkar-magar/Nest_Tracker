@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import EnquiryModal from './EnquiryModal'
 
 const links = [
   ['Rooms', '/rooms'],
@@ -17,6 +18,7 @@ const navCls = ({ isActive }) => `transition-colors hover:text-navy ${isActive ?
 export default function Navbar() {
   const { role, user, signOut, configured } = useAuth()
   const [open, setOpen] = useState(false)
+  const [enquire, setEnquire] = useState(false)
   const navigate = useNavigate()
   const close = () => setOpen(false)
 
@@ -50,7 +52,12 @@ export default function Navbar() {
             <NavLink key={to} to={to} end className={to.includes('#') ? 'transition-colors hover:text-navy' : navCls}>{label}</NavLink>
           ))}
         </nav>
-        <div className="hidden gap-2 text-sm md:flex">{authButtons}</div>
+        <div className="flex items-center gap-2">
+          <div className="hidden gap-2 text-sm md:flex">{authButtons}</div>
+          <button onClick={() => { close(); setEnquire(true) }}
+            className="rounded-full bg-gold px-4 py-2 text-sm font-semibold text-navy transition-colors hover:bg-sun focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy">
+            Enquire Now
+          </button>
         <button
           className="rounded-lg p-2 md:hidden focus-visible:outline-2 focus-visible:outline-navy"
           aria-label="Menu" aria-expanded={open} aria-controls="mobile-menu"
@@ -60,7 +67,9 @@ export default function Navbar() {
             {open ? <path d="M6 6l12 12M18 6L6 18" /> : <path d="M4 7h16M4 12h16M4 17h16" />}
           </svg>
         </button>
+        </div>
       </div>
+      {enquire && <EnquiryModal onClose={() => setEnquire(false)} />}
       {open && (
         <div id="mobile-menu" className="border-t border-navy/10 bg-cream px-4 pb-4 md:hidden">
           <nav aria-label="Mobile" className="flex flex-col py-2">
