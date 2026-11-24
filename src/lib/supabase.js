@@ -7,15 +7,17 @@ const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 // that Vite can see (anything prefixed VITE_ is shipped to the browser).
 export const isConfigured = Boolean(url && anonKey)
 
-// Per-tab sessions, for testing several accounts side by side (customer, staff, admin in different tabs).
-// Open any page with ?tab-session=1 to make that tab keep its own login in sessionStorage; ?tab-session=0 turns it off.
-// Normal tabs share one login through localStorage, so a sign-in in one tab switches the account in all of them.
-function tabSessionStorage() {
+// Each browser tab keeps its own login (sessionStorage), so signing in or out in one tab never affects another
+// and manager / customer / admin can be tested side by side. It survives a reload but not closing the tab.
+// Installed PWAs (standalone window) keep the shared, persistent login in localStorage so the app stays signed in.
+// ?tab-session=0 forces the shared login for that tab; ?tab-session=1 forces per-tab again.
+function authStorage() {
   try {
     const flag = new URLSearchParams(window.location.search).get('tab-session')
-    if (flag === '1') sessionStorage.setItem('yolo.tab-session', '1')
-    if (flag === '0') sessionStorage.removeItem('yolo.tab-session')
-    return sessionStorage.getItem('yolo.tab-session') === '1' ? sessionStorage : undefined
+    if (flag === '1') sessionStorage.removeItem('yolo.shared-login')
+    if (flag === '0') sessionStorage.setItem('yolo.shared-login', '1')
+    const standalone = window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true
+    return standalone || sessionStorage.getItem('yolo.shared-login') === '1' ? undefined : sessionStorage
   } catch {
     return undefined
   }
@@ -23,7 +25,7 @@ function tabSessionStorage() {
 
 export const supabase = isConfigured
   ? createClient(url, anonKey, {
-      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, storage: tabSessionStorage() },
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, storage: authStorage() },
     })
   : null
 
