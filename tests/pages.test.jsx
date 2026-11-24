@@ -146,11 +146,15 @@ describe('Login', () => {
 // ------------------------------------------------------------------ Signup
 describe('Signup', () => {
   const at = () => renderRoute(<Signup />, { path: '/signup' })
-  const fill = async ({ name = ' Asha Rao ', phone = '9876543210', email = ' asha@example.com ', password = 'secret123' } = {}) => {
+  const fill = async ({ name = ' Asha Rao ', phone = '9876543210', email = ' asha@example.com ', password = 'secret123', rules = true } = {}) => {
     await userEvent.type(screen.getByLabelText('Full name'), name)
     await userEvent.type(screen.getByLabelText('Mobile number'), phone)
     await userEvent.type(screen.getByLabelText('Email'), email)
     await userEvent.type(screen.getByLabelText('Password (8+ characters)'), password)
+    await userEvent.type(screen.getByLabelText(/^Name \*/), 'Ravi Rao')
+    await userEvent.type(screen.getByLabelText(/^Relationship \*/), 'Father')
+    await userEvent.type(screen.getAllByLabelText(/^Mobile number \*/)[0], '9811111111')
+    if (rules) await userEvent.click(screen.getByLabelText(/I have read, understood/))
   }
 
   it('explains that accounts need Supabase when it is not configured', () => {
@@ -168,6 +172,17 @@ describe('Signup', () => {
     expect(new RegExp(`^(?:${phone.getAttribute('pattern')})$`).test('9876543210')).toBe(true)
     expect(new RegExp(`^(?:${phone.getAttribute('pattern')})$`).test('12345')).toBe(false)
     expect(new RegExp(`^(?:${phone.getAttribute('pattern')})$`).test('abcdefghij')).toBe(false)
+  })
+  it('shows the paper form sections and asks for the rules to be accepted', async () => {
+    const auth = setAuth()
+    at()
+    for (const t of ['1. Personal details', '2. Emergency contact details', '3. Occupation details', '4. Stay details', '5. Identity verification', '6. Rules and regulations']) {
+      expect(screen.getByRole('region', { name: t })).toBeInTheDocument()
+    }
+    await fill({ rules: false })
+    await userEvent.click(screen.getByRole('button', { name: 'Create account' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Accept the rules')
+    expect(auth.signUp).not.toHaveBeenCalled()
   })
   it('links to terms, privacy and login', () => {
     at()

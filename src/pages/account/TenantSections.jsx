@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { ActionMsg, FileButton, FormFields, Load, StatusBadge, useAction } from '../../components/manage/kit'
-import { TENANT_FIELDS, tenantFormValue, validateTenant } from '../../components/manage/tenantFields'
+import ResidentForm from '../../components/manage/ResidentForm'
+import { clearStash, readStash, tenantFormValue, validateTenant } from '../../components/manage/tenantFields'
 import { Button, Card, Empty, Field, Notice, inputCls } from '../../components/ui'
 import * as m from '../../services/manage'
 import { COMPLAINT_CATEGORIES, addDays, complaintCategory, complaintMoves, ymd } from '../../services/pg'
@@ -21,13 +22,15 @@ export function TenantDetails() {
 }
 
 function DetailsForm({ tp, profile, onSaved }) {
-  const [v, setV] = useState(() => tenantFormValue({ ...profile, tenant_profiles: tp }))
+  const signed = Boolean(tp?.rules_accepted_at)
+  const [kept] = useState(() => (tp ? null : readStash())) // registration filled in before email confirmation
+  const [v, setV] = useState(() => ({ ...tenantFormValue({ ...profile, tenant_profiles: tp }), ...(kept ?? {}), full_name: profile?.full_name ?? '', phone: profile?.phone ?? '' }))
   const a = useAction()
   const save = async (e) => {
     e.preventDefault()
-    const bad = validateTenant(v)
+    const bad = validateTenant(v) || (!signed && !v.rules_accepted ? 'Accept the rules and regulations to register' : '')
     if (bad) return a.run(() => Promise.reject(new Error(bad)))
-    if (await a.run(() => m.saveMyTenantProfile(v), 'Saved')) onSaved()
+    if (await a.run(() => m.saveMyTenantProfile(v), 'Saved')) { clearStash(); onSaved() }
   }
   return (
     <form onSubmit={save}>
@@ -36,8 +39,8 @@ function DetailsForm({ tp, profile, onSaved }) {
           <p className="mb-3 text-sm">Registration: <StatusBadge value={tp.approval_status} />{tp.approval_note && ` · ${tp.approval_note}`}
             {' '}· Police verification: <StatusBadge value={tp.police_status} /></p>
         )}
-        {!tp && <div className="mb-3"><Notice tone="warn">Complete your details and at least one emergency contact so the office can approve your registration.</Notice></div>}
-        <FormFields fields={TENANT_FIELDS.filter((f) => !['full_name', 'phone'].includes(f.key))} value={v} onChange={setV} />
+        {!tp && <div className="mb-3"><Notice tone="warn">{kept ? 'Your registration form is filled in below. Check it and press Save details to submit it.' : 'Complete the registration form, including one emergency contact and the rules, so the office can approve your registration.'}</Notice></div>}
+        <ResidentForm value={v} onChange={setV} skip={['full_name', 'phone']} signed={signed} />
         <div className="mt-4 flex items-center gap-3"><Button type="submit" disabled={a.busy}>Save details</Button><ActionMsg action={a} /></div>
       </Card>
     </form>

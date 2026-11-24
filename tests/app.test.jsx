@@ -45,7 +45,7 @@ describe('public routes', () => {
   })
   it('/signup renders the sign-up form', () => {
     go('/signup')
-    expect(screen.getByRole('heading', { level: 1, name: 'Create your account' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Resident registration' })).toBeInTheDocument()
   })
   it('an unknown URL shows the not-found page with a way home', () => {
     go('/no/such/page')

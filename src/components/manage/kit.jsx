@@ -120,7 +120,7 @@ export function FormFields({ fields, value, onChange }) {
             </label>
           )
         } else {
-          input = <input {...common} type={f.type || 'text'} className={inputCls} value={v} min={f.min} max={f.max} step={f.step}
+          input = <input {...common} type={f.type || 'text'} className={inputCls} value={v} min={f.min} max={f.max} step={f.step} placeholder={f.placeholder} maxLength={f.maxLength}
             inputMode={f.type === 'tel' ? 'tel' : undefined} onChange={(e) => set(f.key, e.target.value)} />
         }
         return (

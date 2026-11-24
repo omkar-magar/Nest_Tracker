@@ -6,7 +6,7 @@ import { as, asService, freshDb, makeUser } from './pg'
 
 let db, owner, manager, otherManager, tenant, tenant2
 
-const emergency = { emergency1_name: 'Asha', emergency1_relation: 'Mother', emergency1_phone: '9811111111' }
+const emergency = { emergency1_name: 'Asha', emergency1_relation: 'Mother', emergency1_phone: '9811111111', rules_accepted: true }
 const bedsOf = async (room) => (await db.query('select id, code from public.beds where room_id = $1 order by label', [room])).rows
 const monthStart = (offset = 0) => {
   const d = new Date(); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() + offset)

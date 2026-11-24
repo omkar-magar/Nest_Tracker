@@ -5,7 +5,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { as, asService, freshDb, makeUser } from './pg'
 
 let db, owner, manager, sales1, sales2, staffUser, tenant, staffId, otherManager
-const emergency = { emergency1_name: 'Asha', emergency1_relation: 'Mother', emergency1_phone: '9811111111' }
+const emergency = { emergency1_name: 'Asha', emergency1_relation: 'Mother', emergency1_phone: '9811111111', rules_accepted: true }
 const one = async (sql, p) => (await db.query(sql, p)).rows[0]
 
 beforeAll(async () => {
@@ -142,6 +142,19 @@ describe('enquiries and sales (PRD 8-9)', () => {
     expect((await one('select reminder_sent_at is not null s from public.site_visits where id = $1', [v.id])).s).toBe(true)
     await as(db, who, ({ q }) => q("select public.set_visit_status($1, 'visited')", [v.id]))
     expect((await one('select status from public.enquiries where id = $1', [lead])).status).toBe('visited')
+  })
+
+  it('resident form: first save needs the rules accepted, then keeps the form fields and the sign-off', async () => {
+    const rita = await makeUser(db, 'customer', 'Rita')
+    const form = { ...emergency, room_type_pref: 'shared_room', move_in_date: '2026-12-01', stay_duration: '6 months', id_proof_type: 'aadhaar', id_last4: '1234', occupation: 'business' }
+    await expect(as(db, rita, ({ q }) => q('select public.save_my_tenant_profile($1)', [{ ...form, rules_accepted: false }]))).rejects.toThrow(/Accept the rules/)
+    await as(db, rita, ({ q }) => q('select public.save_my_tenant_profile($1)', [{ ...form, rules_signature: 'Rita K' }]))
+    const t = await one('select room_type_pref, stay_duration, id_proof_type, id_last4, occupation, rules_signature, rules_accepted_at from public.tenant_profiles where user_id = $1', [rita])
+    expect(t).toMatchObject({ room_type_pref: 'shared_room', stay_duration: '6 months', id_proof_type: 'aadhaar', id_last4: '1234', occupation: 'business', rules_signature: 'Rita K' })
+    expect(t.rules_accepted_at).toBeTruthy()
+    // later edits do not ask again
+    await as(db, rita, ({ q }) => q('select public.save_my_tenant_profile($1)', [{ ...emergency, rules_accepted: undefined, stay_duration: '1 year' }]))
+    expect((await one('select stay_duration from public.tenant_profiles where user_id = $1', [rita])).stay_duration).toBe('1 year')
   })
 
   it('converts a lead on check-in and pays out broker commission and referral reward', async () => {
