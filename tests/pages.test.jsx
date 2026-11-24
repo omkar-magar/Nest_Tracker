@@ -75,7 +75,7 @@ describe('Login', () => {
   })
   it('asks customers for a phone number and staff for a username', () => {
     const { unmount } = at('customer')
-    expect(screen.getByLabelText('Phone number or email')).toBeRequired()
+    expect(screen.getByLabelText('Phone number')).toHaveAttribute('type', 'tel')
     unmount()
     at('admin')
     expect(screen.getByLabelText('Username')).toBeRequired()
@@ -83,7 +83,7 @@ describe('Login', () => {
   })
   it('has labelled, required phone and password fields', () => {
     at()
-    expect(screen.getByLabelText('Phone number or email')).toBeRequired()
+    expect(screen.getByLabelText('Phone number')).toBeRequired()
     expect(screen.getByLabelText('Password')).toBeRequired()
     expect(screen.getByLabelText('Password')).toHaveAttribute('type', 'password')
   })
@@ -91,21 +91,11 @@ describe('Login', () => {
     const auth = setAuth()
     db.rpcs.login_email = { data: 'asha@example.com', error: null }
     at()
-    await userEvent.type(screen.getByLabelText('Phone number or email'), '  9876543210 ')
+    await userEvent.type(screen.getByLabelText('Phone number'), '  9876543210 ')
     await userEvent.type(screen.getByLabelText('Password'), 'secret123')
     await userEvent.click(screen.getByRole('button', { name: 'Log in' }))
     expect(supabase.rpc).toHaveBeenCalledWith('login_email', { p_identifier: '9876543210', p_staff: false })
     expect(auth.signIn).toHaveBeenCalledWith('asha@example.com', 'secret123')
-  })
-  it('lets a guest sign in with an email directly', async () => {
-    const auth = setAuth()
-    supabase.rpc.mockClear()
-    at()
-    await userEvent.type(screen.getByLabelText('Phone number or email'), ' customer@yolonest.test ')
-    await userEvent.type(screen.getByLabelText('Password'), 'secret123')
-    await userEvent.click(screen.getByRole('button', { name: 'Log in' }))
-    expect(supabase.rpc).not.toHaveBeenCalled()
-    expect(auth.signIn).toHaveBeenCalledWith('customer@yolonest.test', 'secret123')
   })
   it('rejects an unknown username without signing in', async () => {
     const auth = setAuth()
@@ -121,7 +111,7 @@ describe('Login', () => {
     db.rpcs.login_email = { data: 'a@b.c', error: null }
     setAuth({ signIn: vi.fn(async () => ({ error: { message: 'Invalid login credentials' } })) })
     at()
-    await userEvent.type(screen.getByLabelText('Phone number or email'), '9876543210')
+    await userEvent.type(screen.getByLabelText('Phone number'), '9876543210')
     await userEvent.type(screen.getByLabelText('Password'), 'wrongpass')
     await userEvent.click(screen.getByRole('button', { name: 'Log in' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Invalid login credentials')
@@ -132,7 +122,7 @@ describe('Login', () => {
     db.rpcs.login_email = { data: 'a@b.c', error: null }
     setAuth({ signIn: vi.fn(() => new Promise((r) => { done = r })) })
     at()
-    await userEvent.type(screen.getByLabelText('Phone number or email'), '9876543210')
+    await userEvent.type(screen.getByLabelText('Phone number'), '9876543210')
     await userEvent.type(screen.getByLabelText('Password'), 'secret123')
     await userEvent.click(screen.getByRole('button', { name: 'Log in' }))
     expect(screen.getByRole('button', { name: 'Signing in…' })).toBeDisabled()
