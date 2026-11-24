@@ -48,7 +48,11 @@ export default function Login({ audience = 'customer' }) {
     e.preventDefault()
     setBusy(true)
     setError('')
-    const { data: authEmail, error: lookupError } = await supabase.rpc('login_email', { p_identifier: email.trim(), p_staff: audience !== 'customer' })
+    const id = email.trim()
+    // guests may type their email instead of a phone number; Supabase Auth signs in by email anyway
+    const byEmail = audience === 'customer' && id.includes('@')
+    const { data: lookedUp, error: lookupError } = byEmail ? { data: id } : await supabase.rpc('login_email', { p_identifier: id, p_staff: audience !== 'customer' })
+    const authEmail = lookedUp
     if (lookupError || !authEmail) {
       setBusy(false)
       return setError('Invalid login credentials')
@@ -75,9 +79,9 @@ export default function Login({ audience = 'customer' }) {
         </Card>
       ) : otp ? <OtpLogin onBack={() => setOtp(false)} /> : (
         <form onSubmit={submit} className="mt-6 space-y-4 rounded-2xl border border-navy/10 bg-white p-5">
-          <Field label={audience === 'customer' ? 'Phone number' : 'Username'}>
+          <Field label={audience === 'customer' ? 'Phone number or email' : 'Username'}>
             {audience === 'customer'
-              ? <input className={inputCls} type="tel" inputMode="tel" autoComplete="tel" required value={email} onChange={(e) => setEmail(e.target.value)} />
+              ? <input className={inputCls} autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} />
               : <input className={inputCls} autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} />}
           </Field>
           <Field label="Password">
