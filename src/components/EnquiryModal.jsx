@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom'
 import { useEffect, useState } from 'react'
 import { Field, Notice, inputCls } from './ui'
 import { categories } from '../data/site'
@@ -40,7 +41,7 @@ export default function EnquiryModal({ onClose }) {
     }
   }
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-navy/60 p-0 sm:items-center sm:p-4" onClick={onClose}>
       <div role="dialog" aria-modal="true" aria-labelledby="enquiry-title" onClick={(e) => e.stopPropagation()}
         className="max-h-full w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white p-6 text-navy sm:rounded-3xl">
@@ -78,6 +79,7 @@ export default function EnquiryModal({ onClose }) {
           </form>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
