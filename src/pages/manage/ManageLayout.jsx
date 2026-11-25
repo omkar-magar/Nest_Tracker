@@ -11,6 +11,8 @@ import { loadProperties, loadStartProperty, runJobs } from '../../services/manag
 // Modules of the management console and the roles that see them. The database enforces the same split.
 export const MODULES = [
   ['', 'Dashboard', ['admin', 'manager']],
+  ['activity', 'Recent activity', ['admin']],
+  ['registrations', 'Registrations', ['admin']],
   ['beds', 'Beds', ['admin', 'manager', 'sales']],
   ['register', 'Guest register', ['admin', 'manager']],
   ['tenants', 'Tenants', ['admin', 'manager']],

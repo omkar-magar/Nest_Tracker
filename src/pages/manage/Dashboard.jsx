@@ -182,7 +182,7 @@ const ACTIONS = [
 
 export default function Dashboard() {
   const { property } = useScope()
-  const { profile } = useAuth()
+  const { profile, role } = useAuth()
   const [period, setPeriod] = useState(0)
   const first = (profile?.full_name ?? '').trim().split(/\s+/)[0]
   const periodLabel = period === 0 ? 'This month' : 'Last month'
@@ -322,7 +322,7 @@ export default function Dashboard() {
                 </section>
 
                 <section className={card} aria-label="Recent activities">
-                  <PanelHead icon="bolt" title="Recent activities" to="/admin/register" />
+                  <PanelHead icon="bolt" title="Recent activities" to={role === 'admin' ? '/admin/activity' : '/admin/register'} />
                   {activities.length === 0 ? <p className="text-sm text-slate-600">Nothing yet.</p> : (
                     <ol className="relative space-y-3 border-l-2 border-navy/10 pl-5">
                       {activities.map((a, i) => {

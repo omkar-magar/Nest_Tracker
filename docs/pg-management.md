@@ -77,6 +77,12 @@ Every action is one row in `complaint_events` (action, who, status before/after,
 the table cannot be updated. Notifications: new complaint → owner and both managers; assignment → the new assignee;
 each status change → the resident (guardian copy if they consented). Board stats come from `complaint_stats()`.
 
+## Registrations and Recent activity (owner only)
+
+- **Registrations** (`/admin/registrations`, `admin_registrations`): every self-registration with its stage (started → waiting → approved/living → checked out, or rejected), how long it has waited or how long approval took, and who has it. "Handling" is the wing managers who got the new-registration alert, and whether they opened their notifications; after a decision it shows who approved or rejected it. A wait over 12 hours is flagged. Managers who open this link still go to Register → New.
+- **Recent activity** (`/admin/activity`, `admin_recent_activity`): the last 1, 7 or 30 days, grouped into Registrations, Complaints, Submissions to review (documents, leave, expenses to approve), Guest register, Money and Enquiries. Rows that still need action are marked, and every row links to the screen where the work is done. The dashboard's "Recent activities" panel opens this page for the owner.
+- Both are read-only and worked out from existing tables. Approvals from Register → New now also write `tenant.approval` to `activity_log`.
+
 ## Setup
 1. Run the new migrations in order (`supabase db push`, or paste them into the SQL editor). `..._01_roles.sql` must be
    committed before the others (it adds enum values). On Render, `npm run db:migrate` applies them too; the storage file

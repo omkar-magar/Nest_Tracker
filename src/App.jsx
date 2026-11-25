@@ -47,12 +47,19 @@ const Sales = lazy(() => import('./pages/manage/Sales'))
 const Staff = lazy(() => import('./pages/manage/Staff'))
 const Reports = lazy(() => import('./pages/manage/Reports'))
 const Settings = lazy(() => import('./pages/manage/Settings'))
+const Registrations = lazy(() => import('./pages/manage/Registrations'))
+const Activity = lazy(() => import('./pages/manage/Activity'))
 
 const MANAGE = ['admin', 'manager']
 // sales executives start on their leads; owner and managers on the dashboard
 function ManageHome() {
   const { role } = useAuth()
   return role === 'sales' ? <Navigate to="/admin/enquiries" replace /> : <Dashboard />
+}
+// the owner gets the registrations pipeline; managers keep the old link into the register
+function RegistrationsHome() {
+  const { role } = useAuth()
+  return role === 'admin' ? <Registrations /> : <Navigate to="/admin/register?tab=new" replace />
 }
 const only = (roles, el) => <RequireRole roles={roles} loginPath="/admin/login">{el}</RequireRole>
 
@@ -134,7 +141,8 @@ export default function App() {
             <Route index element={<ManageHome />} />
             <Route path="beds" element={<Beds />} />
             <Route path="register" element={only(MANAGE, <Register />)} />
-            <Route path="registrations" element={only(MANAGE, <Navigate to="/admin/register?tab=new" replace />)} />
+            <Route path="registrations" element={only(MANAGE, <RegistrationsHome />)} />
+            <Route path="activity" element={only(['admin'], <Activity />)} />
             <Route path="tenants" element={only(MANAGE, <Tenants />)} />
             <Route path="tenants/:id" element={only(MANAGE, <TenantDetail />)} />
             <Route path="checkin" element={only(MANAGE, <CheckIn />)} />

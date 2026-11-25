@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import CrudPanel from '../../components/manage/CrudPanel'
 import DataTable from '../../components/manage/DataTable'
 import { ActionMsg, FileButton, FormFields, H3, Load, Modal, Small, StatusBadge, Tabs, useAction, useScope } from '../../components/manage/kit'
@@ -10,8 +11,12 @@ import { formatDate, formatDateTime, rupees } from '../../services/format'
 
 const DESIGNATIONS = ['manager', 'caretaker', 'housekeeping', 'cook', 'security', 'maintenance', 'sales', 'other']
 
+const TABS = ['people', 'attendance', 'roster', 'leave', 'payroll', 'advances', 'tasks', 'notices']
+
 export default function Staff() {
-  const [tab, setTab] = useState('people')
+  const [params] = useSearchParams()
+  // ?tab=leave opens a section directly (links from Recent activity)
+  const [tab, setTab] = useState(() => (TABS.includes(params.get('tab')) ? params.get('tab') : 'people'))
   return (
     <div>
       <Tabs tab={tab} onTab={setTab} tabs={[['people', 'Employees'], ['attendance', 'Attendance'], ['roster', 'Shifts & roster'], ['leave', 'Leave'],
