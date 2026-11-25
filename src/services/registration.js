@@ -5,7 +5,21 @@ export const DEMO_EMAIL = 'customer@yolonest.test'
 export const demoEnabled = import.meta.env.VITE_DEMO_REGISTRATION === 'true'
 export const submitRegistration = (p) => rpc('submit_resident_registration', { p })
 export const myRegistration = () => rpc('my_registration')
-export const approveRegistration = (id, p) => rpc('approve_resident_registration', { p_user: id, p })
+export const registrationStayError = (p) => p.check_in && p.expected_checkout && p.expected_checkout < p.check_in
+  ? 'Expected check-out must be on or after check-in. Check the day, month and year.' : ''
+
+export async function approveRegistration(id, p) {
+  const error = registrationStayError(p)
+  if (error) throw new Error(error)
+  try {
+    return await rpc('approve_resident_registration', { p_user: id, p })
+  } catch (e) {
+    if (e.code === '23514' && e.message?.includes('"register_guests_check"')) {
+      throw new Error('Expected check-out must be on or after check-in. Check the day, month and year.')
+    }
+    throw e
+  }
+}
 export const registrationProperties = () => rows('properties', 'id, name', (q) => q.eq('is_active', true).order('id'))
 export const newRegistrations = (pid) => rows('tenant_profiles', '*, profiles!tenant_profiles_user_id_fkey(full_name, phone)', (q) =>
   (pid ? q.eq('property_id', pid) : q).eq('registration_state', 'pending').order('updated_at', { ascending: false }).limit(200))

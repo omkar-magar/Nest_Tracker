@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import useAsync from '../../hooks/useAsync'
-import { approveRegistration, newRegistrations } from '../../services/registration'
+import { approveRegistration, newRegistrations, registrationStayError } from '../../services/registration'
 import { loadRegisterRooms } from '../../services/register'
 import { ActionMsg, FormFields, Modal, useAction } from '../manage/kit'
 import { Button, Empty, ErrorBox, Spinner } from '../ui'
@@ -27,6 +27,7 @@ function Approval({ registration: r, onClose, onDone }) {
   const rooms = useAsync(() => loadRegisterRooms(r.property_id), [r.property_id])
   const [v, setV] = useState({ room_no: '', rent: '', deposit: '', due_date: '', check_in: r.move_in_date || ymd(), expected_checkout: '', room_type: 'pg', notes: '' })
   const a = useAction()
+  const dateError = registrationStayError(v)
   const submit = async (e) => { e.preventDefault(); if (await a.run(() => approveRegistration(r.user_id, v))) onDone() }
   return <Modal title={`Approve ${r.profiles?.full_name || 'registration'}`} onClose={onClose} wide>
     <dl className="mb-4 grid gap-2 text-sm sm:grid-cols-2">
@@ -40,11 +41,12 @@ function Approval({ registration: r, onClose, onDone }) {
         { key: 'deposit', label: 'Deposit (₹)', type: 'number', required: true, min: 0 },
         { key: 'due_date', label: 'Rent due date', type: 'date', required: true },
         { key: 'check_in', label: 'Check-in', type: 'date', required: true },
-        { key: 'expected_checkout', label: 'Expected check-out', type: 'date' },
+        { key: 'expected_checkout', label: 'Expected check-out', type: 'date', min: v.check_in || undefined },
         { key: 'room_type', label: 'Room type', type: 'select', required: true, options: [['pg', 'PG'], ['rented', 'Rented']] },
         { key: 'notes', label: 'Notes', type: 'textarea' },
       ]} />
-      <ActionMsg action={a} /><Button type="submit" disabled={a.busy || rooms.loading}>Approve and add to guest register</Button>
+      {dateError && <p role="alert" className="text-sm text-red-700">{dateError}</p>}
+      <ActionMsg action={a} /><Button type="submit" disabled={a.busy || rooms.loading || Boolean(dateError)}>Approve and add to guest register</Button>
     </form>}
   </Modal>
 }

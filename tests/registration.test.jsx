@@ -9,6 +9,7 @@ import { db, resetMock, supabase } from './helpers/supabaseMock'
 import Signup from '../src/pages/Signup'
 import Account from '../src/pages/Account'
 import NewRegistrations from '../src/components/register/NewRegistrations'
+import { approveRegistration, registrationStayError } from '../src/services/registration'
 
 const at = (page) => render(<MemoryRouter>{page}</MemoryRouter>)
 beforeEach(() => {
@@ -58,8 +59,32 @@ describe('demo registration and resident states', () => {
     for (const [label, value] of [['Room *', 'A-101'], ['Monthly rent (₹) *', '6000'], ['Deposit (₹) *', '6000'], ['Rent due date *', '2026-12-03']]) {
       fireEvent.change(screen.getByLabelText(label), { target: { value } })
     }
+    fireEvent.change(screen.getByLabelText('Check-in *'), { target: { value: '2026-11-25' } })
+    const checkout = screen.getByLabelText('Expected check-out')
+    expect(checkout).toHaveAttribute('min', '2026-11-25')
+    fireEvent.change(checkout, { target: { value: '0234-02-21' } })
+    expect(screen.getByRole('alert')).toHaveTextContent('Expected check-out must be on or after check-in')
+    expect(screen.getByRole('button', { name: 'Approve and add to guest register' })).toBeDisabled()
+    expect(supabase.rpc).not.toHaveBeenCalled()
+    fireEvent.change(checkout, { target: { value: '2026-11-26' } })
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Monthly rent (₹) *')).toHaveValue(6000)
+    expect(screen.getByLabelText('Room *')).toHaveValue('A-101')
     fireEvent.click(screen.getByRole('button', { name: 'Approve and add to guest register' }))
     await waitFor(() => expect(approved).toHaveBeenCalled())
     expect(supabase.rpc).toHaveBeenCalledWith('approve_resident_registration', { p_user: 'c1', p: expect.objectContaining({ room_no: 'A-101', rent: '6000', due_date: '2026-12-03' }) })
+  })
+  it('revalidates checkout when check-in changes and allows blank or same-day checkout', () => {
+    expect(registrationStayError({ check_in: '2026-11-25', expected_checkout: '' })).toBe('')
+    expect(registrationStayError({ check_in: '2026-11-25', expected_checkout: '2026-11-25' })).toBe('')
+    expect(registrationStayError({ check_in: '2026-11-26', expected_checkout: '2026-11-25' })).toContain('on or after check-in')
+  })
+  it('rejects the pictured invalid date before calling the database', async () => {
+    await expect(approveRegistration('c1', { check_in: '2026-11-25', expected_checkout: '0234-02-21' })).rejects.toThrow('Expected check-out must be on or after check-in')
+    expect(supabase.rpc).not.toHaveBeenCalled()
+  })
+  it('shows a useful message if the database rejects the date range', async () => {
+    db.rpcs.approve_resident_registration = { error: { code: '23514', message: 'new row for relation "register_guests" violates check constraint "register_guests_check"' } }
+    await expect(approveRegistration('c1', { check_in: '2026-11-25', expected_checkout: '' })).rejects.toThrow('Expected check-out must be on or after check-in')
   })
 })
