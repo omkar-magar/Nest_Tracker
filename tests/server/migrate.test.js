@@ -29,7 +29,9 @@ describe('migration plan', () => {
     expect(names[0]).toBe('server/db/prelude.sql')
     const sb = names.filter((n) => n.startsWith('supabase/'))
     expect(sb).toEqual([...sb].sort())
-    expect(sb).toHaveLength(26) // storage migrations are skipped
+    // every supabase migration on disk except the storage ones
+    const onDisk = (await readdir(path.join(root, 'supabase/migrations'))).filter((f) => f.endsWith('.sql') && !SKIPPED.has(f))
+    expect(sb).toEqual(onDisk.sort().map((f) => `supabase/migrations/${f}`))
     expect(names.indexOf(sb.at(-1))).toBeLessThan(names.indexOf('server/db/migrations/001_availability_notify.sql'))
     expect(names.slice(-2)).toEqual([
       'server/db/migrations/001_availability_notify.sql',

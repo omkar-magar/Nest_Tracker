@@ -49,6 +49,7 @@ const Reports = lazy(() => import('./pages/manage/Reports'))
 const Settings = lazy(() => import('./pages/manage/Settings'))
 const Registrations = lazy(() => import('./pages/manage/Registrations'))
 const Activity = lazy(() => import('./pages/manage/Activity'))
+const Inventory = lazy(() => import('./pages/manage/Inventory'))
 
 const MANAGE = ['admin', 'manager']
 // sales executives start on their leads; owner and managers on the dashboard
@@ -140,6 +141,7 @@ export default function App() {
           <Route path="admin" element={<RequireRole roles={['admin', 'manager', 'sales']} loginPath="/admin/login"><ManageLayout /></RequireRole>}>
             <Route index element={<ManageHome />} />
             <Route path="beds" element={<Beds />} />
+            <Route path="inventory" element={only(MANAGE, <Inventory />)} />
             <Route path="register" element={only(MANAGE, <Register />)} />
             <Route path="registrations" element={only(MANAGE, <RegistrationsHome />)} />
             <Route path="activity" element={only(['admin'], <Activity />)} />

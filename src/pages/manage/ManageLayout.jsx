@@ -14,6 +14,7 @@ export const MODULES = [
   ['activity', 'Recent activity', ['admin']],
   ['registrations', 'Registrations', ['admin']],
   ['beds', 'Beds', ['admin', 'manager', 'sales']],
+  ['inventory', 'Inventory', ['admin', 'manager']],
   ['register', 'Guest register', ['admin', 'manager']],
   ['tenants', 'Tenants', ['admin', 'manager']],
   ['billing', 'Rent & payments', ['admin', 'manager']],
