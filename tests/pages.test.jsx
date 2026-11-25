@@ -183,7 +183,7 @@ describe('Signup', () => {
       expect(screen.getByRole('region', { name: t })).toBeInTheDocument()
     }
     await fill({ rules: false })
-    await userEvent.click(screen.getByRole('button', { name: 'Create account' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Continue to verification' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Accept the rules')
     expect(auth.signUp).not.toHaveBeenCalled()
   })
@@ -193,25 +193,61 @@ describe('Signup', () => {
     expect(screen.getByRole('link', { name: 'privacy policy' })).toHaveAttribute('href', '/privacy')
     expect(screen.getByRole('link', { name: 'Log in' })).toHaveAttribute('href', '/login')
   })
-  it('creates the account with trimmed name and email', async () => {
+  it('creates the account with trimmed name and email at the OTP step', async () => {
     const auth = setAuth({ signUp: vi.fn(async () => ({ data: { session: { user: {} } }, error: null })) })
     at()
     await fill()
-    await userEvent.click(screen.getByRole('button', { name: 'Create account' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Continue to verification' }))
+    expect(auth.signUp).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByRole('button', { name: 'Send verification code' }))
     expect(auth.signUp).toHaveBeenCalledWith('asha@example.com', 'secret123', 'Asha Rao', '9876543210')
+    await waitFor(() => expect(supabase.rpc).toHaveBeenCalledWith('submit_resident_registration', { p: expect.objectContaining({ email: 'asha@example.com' }) }))
   })
-  it('asks the customer to confirm their email when no session is returned', async () => {
+  it('verifies the emailed OTP, then submits the registration', async () => {
+    supabase.auth.verifyOtp = vi.fn(async () => ({ data: { session: {} }, error: null }))
     at()
     await fill()
-    await userEvent.click(screen.getByRole('button', { name: 'Create account' }))
-    expect(await screen.findByText(/Check your email to confirm your account/)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'log in' })).toHaveAttribute('href', '/login')
+    await userEvent.click(screen.getByRole('button', { name: 'Continue to verification' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Send verification code' }))
+    expect(await screen.findByText(/Enter the code we emailed/)).toBeInTheDocument()
+    await userEvent.type(screen.getByLabelText('Email OTP'), ' 123456 ')
+    await userEvent.click(screen.getByRole('button', { name: 'Verify and register' }))
+    await waitFor(() => expect(supabase.auth.verifyOtp).toHaveBeenCalledWith({ email: 'asha@example.com', token: '123456', type: 'signup' }))
+    await waitFor(() => expect(supabase.rpc).toHaveBeenCalledWith('submit_resident_registration', expect.anything()))
+  })
+  it('takes the registration payment before the OTP when a fee is set', async () => {
+    db.rpcs.registration_fee = { data: 1000, error: null }
+    db.rpcs.start_registration_payment = { data: { id: 'pay-1', amount: 1000 }, error: null }
+    db.rpcs.demo_complete_registration_payment = { data: { id: 'pay-1', status: 'succeeded', amount: 1000, is_simulated: true }, error: null }
+    const auth = setAuth({ signUp: vi.fn(async () => ({ data: { session: { user: {} } }, error: null })) })
+    at()
+    await fill()
+    await userEvent.click(await screen.findByRole('button', { name: 'Continue to payment' }))
+    expect(screen.queryByRole('button', { name: 'Send verification code' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /demo success/ }))
+    expect(supabase.rpc).toHaveBeenCalledWith('start_registration_payment', { p_email: 'asha@example.com', p_phone: '9876543210', p_property: 'P1' })
+    expect(await screen.findByText(/Registration payment of ₹1,000 received/)).toBeInTheDocument()
+    expect(auth.signUp).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByRole('button', { name: 'Send verification code' }))
+    await waitFor(() => expect(supabase.rpc).toHaveBeenCalledWith('submit_resident_registration', { p: expect.objectContaining({ payment_id: 'pay-1' }) }))
+  })
+  it('stays on the payment step when the payment fails', async () => {
+    db.rpcs.registration_fee = { data: 1000, error: null }
+    db.rpcs.start_registration_payment = { data: { id: 'pay-2', amount: 1000 }, error: null }
+    db.rpcs.demo_complete_registration_payment = { data: { id: 'pay-2', status: 'failed', amount: 1000 }, error: null }
+    at()
+    await fill()
+    await userEvent.click(await screen.findByRole('button', { name: 'Continue to payment' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Simulate a failed payment' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Payment failed')
+    expect(screen.queryByText(/Verify your email/)).not.toBeInTheDocument()
   })
   it('shows the sign-up error (e.g. email already registered)', async () => {
     setAuth({ signUp: vi.fn(async () => ({ data: null, error: { message: 'User already registered' } })) })
     at()
     await fill()
-    await userEvent.click(screen.getByRole('button', { name: 'Create account' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Continue to verification' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Send verification code' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('User already registered')
   })
   it('sends an already signed-in user to their account', () => {

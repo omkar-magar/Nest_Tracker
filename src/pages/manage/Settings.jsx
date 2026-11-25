@@ -130,6 +130,10 @@ const RULES = [
   ['google_review_url', 'Google review link (shown to tenants)', { text: true }],
   ['hold_minutes', 'Online booking hold (minutes)', { type: 'number', min: 5 }],
   ['demo_payments_enabled', 'Demo payments enabled', { type: 'checkbox' }],
+  ['registration_fee', 'Registration payment before OTP (₹, 0 = none)', { type: 'number', min: 0 }],
+  ['addon_prices.chair', 'Extra chair, added to next rent (₹)', { type: 'number', min: 0 }],
+  ['addon_prices.table', 'Extra table, added to next rent (₹)', { type: 'number', min: 0 }],
+  ['addon_prices.cupboard', 'Extra cupboard, added to next rent (₹)', { type: 'number', min: 0 }],
 ]
 
 function Rules() {

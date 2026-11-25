@@ -14,6 +14,7 @@ const approve = (who = manager, patch = {}) => as(db, who, ({ one }) => one('sel
 
 beforeAll(async () => {
   db = await freshDb()
+  await db.query("update public.app_settings set value = '0' where key = 'registration_fee'") // payment covered in stay.test.js
   guest = await makeUser(db)
   other = await makeUser(db)
   manager = await makeUser(db, 'manager')

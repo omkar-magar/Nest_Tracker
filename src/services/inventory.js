@@ -3,7 +3,7 @@ import { rows } from './manage'
 
 // Furniture and mattress stock per room (table room_inventory; who may read or edit is in its RLS).
 export const INVENTORY_ITEMS = [
-  ['mattress', 'Mattresses'], ['cupboard', 'Cupboards'], ['table', 'Tables'], ['bed', 'Beds'], ['chair', 'Chairs'],
+  ['mattress', 'Mattresses'], ['cupboard', 'Cupboards'], ['table', 'Tables'], ['bed', 'Beds'], ['chair', 'Chairs'], ['pillow', 'Pillows'],
 ]
 
 export const loadInventory = (pid) =>

@@ -68,7 +68,7 @@ describe('Inventory tab', () => {
     await userEvent.clear(chairs)
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     const saved = queryFor('room_inventory').map((q) => opArgs(q, 'upsert')).find(Boolean)
-    expect(saved[0]).toHaveLength(5)
+    expect(saved[0]).toHaveLength(6)
     expect(saved[0].find((r) => r.item === 'chair')).toEqual({ property_id: 'P1', room_no: '102', item: 'chair', qty: 0 })
     expect(saved[0].find((r) => r.item === 'bed').qty).toBe(5)
   })
@@ -87,5 +87,29 @@ describe('Beds tab', () => {
     db.tables.room_inventory = { data: stock, error: null }
     asRole('manager'); page(<Beds />)
     expect(await screen.findByText('Furniture: 5 mattresses · 5 beds · 1 chair')).toBeInTheDocument()
+  })
+})
+
+describe('Extra furniture requests', () => {
+  const req = (id, item, status, extra = {}) => ({ id, property_id: 'P1', room_no: 'A-102', item, qty: 1, unit_price: 100, amount: 100, status, resident: 'Amit', ...extra })
+  it('lists waiting requests and approves one into the room and the next rent', async () => {
+    db.tables.room_inventory = { data: stock, error: null }
+    db.rpcs.addon_requests = { data: [req(1, 'chair', 'requested'), req(2, 'table', 'approved', { charge_month: '2026-12-01', amount: 400 })], error: null }
+    asRole('manager'); page(<Inventory />)
+    const section = await screen.findByRole('region', { name: 'Extra furniture requests' })
+    expect(within(section).getByText('1 waiting')).toBeInTheDocument()
+    expect(within(section).queryByText('1 × Table')).not.toBeInTheDocument()
+    await userEvent.click(within(section).getByRole('button', { name: 'Approve' }))
+    const { supabase } = await import('./helpers/supabaseMock.js')
+    expect(supabase.rpc).toHaveBeenCalledWith('decide_addon', { p_id: 1, p_approve: true, p_note: '' })
+    await userEvent.click(within(section).getByRole('button', { name: 'Show answered too' }))
+    expect(within(section).getByText('on December 2026 rent')).toBeInTheDocument()
+  })
+  it('stays hidden when nobody has asked for anything', async () => {
+    db.tables.room_inventory = { data: stock, error: null }
+    db.rpcs.addon_requests = { data: [], error: null }
+    asRole('manager'); page(<Inventory />)
+    await screen.findByText('Total count')
+    expect(screen.queryByRole('region', { name: 'Extra furniture requests' })).not.toBeInTheDocument()
   })
 })

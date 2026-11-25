@@ -27,8 +27,8 @@ describe('demo registration and resident states', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Fill demo registration' }))
     expect(screen.getByLabelText('Email')).toHaveValue('customer@yolonest.test')
     expect(screen.getByLabelText(/I have read, understood/)).toBeChecked()
-    fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
-    fireEvent.change(screen.getByLabelText('Demo OTP'), { target: { value: 'x' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Continue to verification' }))
+    fireEvent.change(await screen.findByLabelText('Demo OTP'), { target: { value: 'x' } })
     fireEvent.click(screen.getByRole('button', { name: 'Verify demo OTP and register' }))
     await waitFor(() => expect(supabase.rpc).toHaveBeenCalledWith('submit_resident_registration', { p: expect.objectContaining({ email: 'customer@yolonest.test', property_id: 'P1' }) }))
     expect(auth.signUp).not.toHaveBeenCalled()
@@ -36,7 +36,6 @@ describe('demo registration and resident states', () => {
   })
   it.each([
     ['pending', /Waiting for manager’s approval/],
-    ['active', /Your registration is approved/],
     ['ended', /Thank you for staying with us/],
   ])('shows the %s state and refreshes after a manager action', async (state, message) => {
     asRole('customer')
@@ -47,6 +46,36 @@ describe('demo registration and resident states', () => {
     db.rpcs.my_registration = { data: { state: 'ended', stays: [{ id: 1, room_no: 'A-101', removed: true, rent: 6000, deposit: 6000 }] } }
     fireEvent.click(screen.getByRole('button', { name: 'Refresh status' }))
     expect(await screen.findByText(/Room A-101 · Removed/)).toBeInTheDocument()
+  })
+  it('opens the full resident dashboard once approved: stay, rent this month and next, room items and extras', async () => {
+    asRole('customer')
+    db.rpcs.my_registration = { data: { state: 'active', payment: { amount: 1000, status: 'succeeded', is_simulated: true, paid_at: '2026-11-20T10:00:00Z' }, stays: [] } }
+    db.rpcs.my_stay = { data: {
+      room_no: 'A-102', property_name: 'A wing', rent: 6000, deposit: 6000, deposit_status: 'paid', check_in: '2026-11-01',
+      months: [
+        { month: '2026-11-01', due_date: '2026-11-05', rent: 6000, extras: [], total: 6000, status: 'paid' },
+        { month: '2026-12-01', due_date: '2026-12-05', rent: 6000, extras: [{ item: 'chair', qty: 2, amount: 200 }], total: 6200, status: 'upcoming' },
+      ],
+      inventory: { bed: 5, mattress: 5, pillow: 5, chair: 1 },
+      addons: [{ id: 7, item: 'chair', qty: 2, unit_price: 100, status: 'approved', charge_month: '2026-12-01', note: '' }],
+      addon_prices: { chair: 100, table: 400, cupboard: 500 },
+    } }
+    db.rpcs.my_electricity_connection = { data: { room_label: 'A-102', consumer_id: '170681865295' } }
+    db.rpcs.request_addon = { data: 8 }
+    at(<Account />)
+    expect(await screen.findByText(/Your registration is approved/)).toBeInTheDocument()
+    expect(await screen.findByText('This month · November 2026')).toBeInTheDocument()
+    expect(screen.getByText('Next rent · December 2026')).toBeInTheDocument()
+    expect(screen.getByText('2 × Chair (extra)')).toBeInTheDocument()
+    expect(screen.getByText('₹6,200')).toBeInTheDocument()
+    expect(screen.getByText('Pillows')).toBeInTheDocument()
+    expect(await screen.findByText('170681865295')).toBeInTheDocument()
+    expect(screen.getByText(/Registration payment: ₹1,000 paid/)).toBeInTheDocument()
+    expect(screen.queryByText('Current booking')).not.toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Item'), { target: { value: 'cupboard' } })
+    fireEvent.change(screen.getByLabelText('How many'), { target: { value: '2' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Request · ₹1,000' }))
+    await waitFor(() => expect(supabase.rpc).toHaveBeenCalledWith('request_addon', { p_item: 'cupboard', p_qty: 2 }))
   })
   it('lets the manager review registration details and supply the stay terms before approval', async () => {
     db.tables.tenant_profiles = { data: [{ user_id: 'c1', property_id: 'P1', email: 'customer@yolonest.test', profiles: { full_name: 'Demo Customer', phone: '9800000000' } }] }

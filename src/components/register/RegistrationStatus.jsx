@@ -9,6 +9,7 @@ export default function RegistrationStatus({ registration, reload, children }) {
       ? 'Thank you for staying with us! Your stay has ended. To extend your stay or return, please get help from your manager.'
       : registration.approval === 'rejected' ? 'Your registration needs attention. Please contact your manager.'
         : 'Waiting for manager’s approval. Your registration has been received. Your manager will confirm your room, rent and due date.'}</Notice>
+    {registration.payment?.status === 'succeeded' && <p className="text-sm">Registration payment: {rupees(registration.payment.amount)} paid on {formatDate(registration.payment.paid_at)}{registration.payment.is_simulated ? ' (demo)' : ''}.</p>}
     <Button variant="outline" onClick={reload}>Refresh status</Button>
     <h2 className="text-xl font-bold">{active ? 'Stay details and history' : 'Stay history'}</h2>
     {!(registration.stays ?? []).length && <p className="text-sm text-slate-600">Your stay details will appear after approval.</p>}

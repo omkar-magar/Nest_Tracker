@@ -13,6 +13,7 @@ import { invoicePdf, receiptPdf } from '../services/pdfDocs'
 import { owedOn } from '../services/billing'
 import { myRegistration } from '../services/registration'
 import RegistrationStatus from '../components/register/RegistrationStatus'
+import MyStay from './account/MyStay'
 
 const DOC_TYPES = { id_proof: 'ID proof', address_proof: 'Address proof', photo: 'Photo', agreement: 'Agreement', other: 'Other' }
 const billTone = { Paid: 'green', Due: 'amber', 'Part paid': 'amber', Overdue: 'red', Void: 'gray' }
@@ -143,24 +144,34 @@ function ProfileForm({ profile, onSaved }) {
   )
 }
 
+function RegistrationPaid({ payment }) {
+  if (payment?.status !== 'succeeded') return null
+  return <p className="mt-3 text-sm text-slate-600">Registration payment: {rupees(payment.amount)} paid on {formatDate(payment.paid_at)}{payment.is_simulated ? ' (demo)' : ''}.</p>
+}
+
 const H2 = ({ children, id }) => <h2 id={id} className="mb-3 mt-10 scroll-mt-16 text-xl font-bold">{children}</h2>
 
 export default function Account() {
   const { user } = useAuth()
   const registration = useAsync(myRegistration, [user.id])
+  const live = registration.data?.state === 'active'
+  // poll while waiting for the manager; once approved the dashboard has everything
   useEffect(() => {
+    if (live) return undefined
     const refresh = () => registration.reload()
     window.addEventListener('focus', refresh)
     const timer = window.setInterval(refresh, 15000)
     return () => { window.removeEventListener('focus', refresh); window.clearInterval(timer) }
-  }, [user.id])
+  }, [user.id, live])
   if (registration.loading) return <Spinner label="Loading registration status" />
-  if (registration.error) return <ErrorBox error={registration.error} onRetry={registration.reload} />
+  if (registration.error && !registration.data) return <ErrorBox error={registration.error} onRetry={registration.reload} />
+  // approved residents get the full dashboard; waiting, declined or ended registrations see their status
+  if (registration.data?.state === 'active') return <AccountDashboard registration={registration.data} />
   if (registration.data?.state) return <RegistrationStatus registration={registration.data} reload={registration.reload} />
   return <AccountDashboard />
 }
 
-function AccountDashboard() {
+function AccountDashboard({ registration }) {
   const { user, profile, refreshProfile } = useAuth()
   const { state } = useLocation()
   const { data, error, loading, reload } = useAsync(() => loadMyAccount(user.id), [user.id])
@@ -189,7 +200,10 @@ function AccountDashboard() {
   const live = data.bookings.find((b) => b.status === 'active' || b.status === 'pending')
   const past = data.bookings.filter((b) => b !== live)
   const sum = summarize(data.bills, data.payments)
-  const hasStay = data.bookings.some((b) => ['active', 'completed'].includes(b.status))
+  const resident = registration?.state === 'active' // stay comes from the guest register, not a booking
+  const hasStay = resident || data.bookings.some((b) => ['active', 'completed'].includes(b.status))
+  // register residents have no bookings or online bills; keep those sections only if something is there
+  const showBilling = !resident || data.bookings.length > 0 || data.bills.length > 0 || data.payments.length > 0
 
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-8 text-navy">
@@ -198,7 +212,17 @@ function AccountDashboard() {
         <NotificationBell />
       </div>
       {state?.justBooked && <div className="mt-4"><Notice tone="ok">Your beds are reserved. Pay the bills below to confirm your booking.</Notice></div>}
+      {resident && <div className="mt-4"><Notice tone="ok">Your registration is approved. Welcome to YOLO Nest!</Notice></div>}
 
+      {resident && (
+        <>
+          <H2 id="my-stay">My stay</H2>
+          <MyStay />
+          <RegistrationPaid payment={registration.payment} />
+        </>
+      )}
+
+      {showBilling && <>
       <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="Amount paid" value={rupees(sum.amountPaid)} />
         <Stat label="Outstanding" value={rupees(sum.outstanding)} tone={sum.overdue.length ? 'red' : undefined} hint={sum.overdue.length ? `${sum.overdue.length} overdue` : undefined} />
@@ -210,9 +234,12 @@ function AccountDashboard() {
       {live && <div className="mb-3"><NoticeToVacate booking={live} onChanged={reload} /></div>}
       {live ? <BookingCard booking={live} onChanged={reload} /> : <Empty title="No current booking">Find a room on the <Link className="underline" to="/rooms">Rooms page</Link>.</Empty>}
 
+      </>}
+
       <H2 id="electricity">Electricity bill</H2>
       <MyElectricity />
 
+      {showBilling && <>
       <H2>Bills</H2>
       {sum.nextBill && <div className="mb-3"><Button variant="sun" onClick={() => setPaying(sum.nextBill)}>Pay next bill · {rupees(owedOn(sum.nextBill))}</Button></div>}
       {data.bills.length === 0 ? <Empty title="No bills yet" /> : (
@@ -244,6 +271,8 @@ function AccountDashboard() {
           ))}
         </Table>
       )}
+
+      </>}
 
       <H2 id="documents">Documents</H2>
       <Documents docs={data.documents} userId={user.id} bookingId={live?.id} onChanged={reload} />

@@ -10,6 +10,7 @@ const row = (r, id) => r.rows.find((x) => x.id === id)
 
 beforeAll(async () => {
   db = await freshDb()
+  await db.query("update public.app_settings set value = '0' where key = 'registration_fee'") // payment covered in stay.test.js
   owner = await makeUser(db, 'admin', 'Owner')
   manager = await makeUser(db, 'manager', 'Priya')
   other = await makeUser(db, 'manager', 'Rahul')

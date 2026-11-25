@@ -6,6 +6,7 @@ import { ActionMsg, FormFields, Modal, useAction } from '../manage/kit'
 import { Button, Empty, ErrorBox, Spinner } from '../ui'
 import { TENANT_SECTIONS } from '../manage/tenantFields'
 import { ymd } from '../../services/pg'
+import { formatDate, rupees } from '../../services/format'
 
 export default function NewRegistrations({ pid, onApproved }) {
   const q = useAsync(() => newRegistrations(pid), [pid])
@@ -16,12 +17,16 @@ export default function NewRegistrations({ pid, onApproved }) {
     <Button variant="outline" onClick={q.reload}>Refresh registrations</Button>
     {!q.data?.length && <Empty title="No new registrations" />}
     {(q.data ?? []).map((r) => <div key={r.user_id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-navy/10 p-4">
-      <div><p className="font-semibold">{r.profiles?.full_name}</p><p className="text-sm text-slate-600">{r.email} · {r.profiles?.phone}</p></div>
+      <div><p className="font-semibold">{r.profiles?.full_name}</p><p className="text-sm text-slate-600">{r.email} · {r.profiles?.phone}</p><PaidLine pay={r.registration_payment} /></div>
       <Button onClick={() => setSelected(r)}>Review and approve</Button>
     </div>)}
     {selected && <Approval registration={selected} onClose={() => setSelected(null)} onDone={() => { setSelected(null); q.reload(); onApproved() }} />}
   </div>
 }
+
+const PaidLine = ({ pay }) => (pay
+  ? <p className="text-sm text-green-800">Registration payment {rupees(pay.amount)} paid{pay.is_simulated ? ' (demo)' : ''}{pay.completed_at ? ` on ${formatDate(pay.completed_at)}` : ''}</p>
+  : <p className="text-sm text-slate-600">No registration payment</p>)
 
 function Approval({ registration: r, onClose, onDone }) {
   const rooms = useAsync(() => loadRegisterRooms(r.property_id), [r.property_id])
@@ -30,6 +35,7 @@ function Approval({ registration: r, onClose, onDone }) {
   const dateError = registrationStayError(v)
   const submit = async (e) => { e.preventDefault(); if (await a.run(() => approveRegistration(r.user_id, v))) onDone() }
   return <Modal title={`Approve ${r.profiles?.full_name || 'registration'}`} onClose={onClose} wide>
+    <div className="mb-3"><PaidLine pay={r.registration_payment} /></div>
     <dl className="mb-4 grid gap-2 text-sm sm:grid-cols-2">
       {TENANT_SECTIONS.flatMap((s) => s.fields).filter((f) => !['full_name', 'phone'].includes(f.key)).map((f) => <div key={f.key}><dt className="text-slate-600">{f.label}</dt><dd className="break-words">{typeof r[f.key] === 'boolean' ? (r[f.key] ? 'Yes' : 'No') : r[f.key] || '—'}</dd></div>)}
       <div><dt>Rules accepted</dt><dd>{r.rules_signature || '—'}</dd></div>
