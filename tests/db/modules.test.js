@@ -66,7 +66,7 @@ describe('complaints (PRD 6)', () => {
   })
 
   it('follows the status flow, notifies on each change, and books the repair cost as an expense', async () => {
-    await as(db, manager, ({ q }) => q('select public.update_complaint($1, $2)', [cid, { assigned_to: staffUser, priority: 'high' }]))
+    await as(db, owner, ({ q }) => q('select public.update_complaint($1, $2)', [cid, { assigned_to: staffUser, priority: 'high' }]))
     expect((await one('select status from public.complaints where id = $1', [cid])).status).toBe('assigned')
     await expect(as(db, tenant, ({ q }) => q('select public.update_complaint($1, $2)', [cid, { status: 'resolved' }]))).rejects.toThrow()
     await as(db, staffUser, ({ q }) => q('select public.update_complaint($1, $2)', [cid, { status: 'in_progress', note: 'On it' }]))
@@ -77,7 +77,7 @@ describe('complaints (PRD 6)', () => {
     await as(db, tenant, ({ q }) => q('select public.update_complaint($1, $2)', [cid, { status: 'reopen', note: 'Still leaking' }]))
     const c = await one('select status, reopen_count from public.complaints where id = $1', [cid])
     expect(c).toEqual({ status: 'assigned', reopen_count: 1 })
-    await expect(as(db, staffUser, ({ q }) => q('select public.update_complaint($1, $2)', [cid, { status: 'closed' }]))).rejects.toThrow(/Cannot move/)
+    await expect(as(db, staffUser, ({ q }) => q('select public.update_complaint($1, $2)', [cid, { status: 'closed' }]))).rejects.toThrow(/admin can close/)
     await as(db, staffUser, ({ q }) => q('select public.update_complaint($1, $2)', [cid, { status: 'resolved' }]))
     await as(db, tenant, ({ q }) => q('select public.update_complaint($1, $2)', [cid, { status: 'closed', rating: 4, feedback: 'Fixed' }]))
     expect((await one('select status, rating from public.complaints where id = $1', [cid]))).toEqual({ status: 'closed', rating: 4 })
