@@ -9,6 +9,7 @@ import { download, exportExcel, exportPDF } from '../../services/exporters'
 import { ymd } from '../../services/pg'
 import { formatDate, rupees } from '../../services/format'
 import { AddGuestModal, ChangesModal, CheckoutModal, History, PastGuests, StatusPill, Tools } from './RegisterPanels'
+import NewRegistrations from './NewRegistrations'
 
 // The guest register for one property: who is in which room, rent and deposit, check-in / check-out dates.
 // Owner and managers edit; a caretaker with "view customers" switched on only reads. Room type (PG or rented)
@@ -59,7 +60,7 @@ function Register({ pid, canEdit }) {
   const guests = useAsync(() => r.loadRegister(pid), [pid])
   const rooms = useAsync(() => r.loadRegisterRooms(pid), [pid])
   const [list, setList] = useState(null)
-  const [tab, setTab] = useState('current')
+  const [tab, setTab] = useState(() => new URLSearchParams(location.search).get('tab') === 'new' && canEdit ? 'new' : 'current')
   const [plan, setPlan] = useState(null)
   const [planned, setPlanned] = useState(false)
   const [notice, setNotice] = useState('')
@@ -80,12 +81,13 @@ function Register({ pid, canEdit }) {
   if (!list || rooms.loading) return <TableSkeleton />
 
   const reload = () => guests.reload()
-  const tabs = [['current', 'Current guests'], ['past', 'Past guests'], ...(canEdit ? [['history', 'Change history'], ['tools', 'Import and AI link']] : [])]
+  const tabs = [['current', 'Current guests'], ...(canEdit ? [['new', 'New registrations']] : []), ['past', 'Past guests'], ...(canEdit ? [['history', 'Change history'], ['tools', 'Import and AI link']] : [])]
   return (
     <div>
       {pending && !canEdit && <div className="mb-4"><Notice tone="warn">Only the owner or a manager can apply changes from a link.</Notice></div>}
       {notice && <p role="status" className="mb-3 text-sm text-green-800">{notice}</p>}
       <Tabs label="Guest register" tabs={tabs} tab={tab} onTab={setTab} />
+      {tab === 'new' && canEdit && <NewRegistrations pid={pid} onApproved={() => { reload(); setTab('current') }} />}
       {tab === 'current' && <Current pid={pid} list={list} setList={setList} rooms={rooms.data} roomNos={roomNos} canEdit={canEdit} reload={reload} />}
       {tab === 'past' && <PastGuests pid={pid} canEdit={canEdit} onChanged={reload} />}
       {tab === 'history' && <History pid={pid} onChanged={reload} />}
@@ -371,6 +373,7 @@ function GuestDetails({ g, room, canEdit, roomNos, onSaved, onCheckout, onClose 
             <EditCell g={g} k="deposit_status" label="Deposit status" options={STATUS_OPTS} onSaved={onSaved} />
             <EditCell g={g} k="check_in" label="Check-in" type="date" onSaved={onSaved} />
             <EditCell g={g} k="expected_checkout" label="Expected check-out" type="date" onSaved={onSaved} />
+            <EditCell g={g} k="due_date" label="Rent due date" type="date" onSaved={onSaved} />
             <EditCell g={g} k="notes" label="Notes" span onSaved={onSaved} />
           </div>
           <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
@@ -390,6 +393,7 @@ function GuestDetails({ g, room, canEdit, roomNos, onSaved, onCheckout, onClose 
           <div><dt className="text-xs text-slate-500">Deposit</dt><dd>{money(g.deposit)} <StatusPill value={g.deposit_status} /></dd></div>
           <div><dt className="text-xs text-slate-500">Check-in</dt><dd>{date(g.check_in)}</dd></div>
           <div><dt className="text-xs text-slate-500">Expected check-out</dt><dd>{date(g.expected_checkout)}</dd></div>
+          <div><dt className="text-xs text-slate-500">Rent due date</dt><dd>{date(g.due_date)}</dd></div>
           <div className="col-span-2"><dt className="text-xs text-slate-500">Notes</dt><dd className="break-words">{g.notes || '—'}</dd></div>
         </dl>
       )}

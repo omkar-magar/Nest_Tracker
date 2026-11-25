@@ -8,7 +8,7 @@ import { ymd } from './pg'
 export const STATUSES = ['paid', 'pending', 'partially_paid', 'not_updated', 'not_applicable']
 export const STATUS_TEXT = { paid: 'Paid', pending: 'Pending', partially_paid: 'Partially paid', not_updated: 'Not updated', not_applicable: 'Not applicable' }
 export const FIELDS = ['room_no', 'name', 'contact', 'rent', 'deposit', 'rent_status', 'deposit_status', 'check_in', 'expected_checkout', 'notes']
-const LIVE_COLS = 'id, property_id, room_no, sort_order, name, contact, rent, deposit, rent_status, deposit_status, check_in, expected_checkout, notes, room_type, updated_at'
+const LIVE_COLS = 'id, property_id, room_no, sort_order, name, contact, rent, deposit, rent_status, deposit_status, check_in, expected_checkout, notes, room_type, updated_at, due_date'
 
 // ---------------------------------------------------------------- data
 export async function loadRegisterProperties() {
@@ -82,7 +82,7 @@ export const departures = (bookings = [], leaving = []) => [
 
 // ---------------------------------------------------------------- values
 const NUMS = ['rent', 'deposit']
-const DATES = ['check_in', 'expected_checkout', 'checked_out_on']
+const DATES = ['check_in', 'expected_checkout', 'checked_out_on', 'due_date']
 export const money = (v) => {
   const s = String(v ?? '').replace(/[₹,\s]|rs\.?/gi, '')
   return s !== '' && /^\d+(\.\d+)?$/.test(s) ? Math.round(Number(s)) : null
@@ -106,7 +106,7 @@ export function clean(set) {
   const out = {}
   for (const [k, raw] of Object.entries(set)) {
     if (k === 'room_type') { out[k] = raw === 'pg' ? 'pg' : 'rented'; continue }
-    if (!FIELDS.includes(k) && k !== 'checked_out_on' && k !== 'checkout_note') continue
+    if (!FIELDS.includes(k) && k !== 'checked_out_on' && k !== 'checkout_note' && k !== 'due_date') continue
     if (NUMS.includes(k)) out[k] = money(raw)
     else if (DATES.includes(k)) out[k] = raw ? toDate(raw) : null
     else if (k.endsWith('_status')) out[k] = toStatus(raw) ?? 'not_updated'

@@ -8,6 +8,8 @@ import * as m from '../../services/manage'
 import { COMPLAINT_CATEGORIES, addDays, complaintCategory, complaintMoves, ymd } from '../../services/pg'
 import { agreementPdf } from '../../services/pdfDocs'
 import { formatDate, formatDateTime } from '../../services/format'
+import useAsync from '../../hooks/useAsync'
+import { registrationProperties, submitRegistration } from '../../services/registration'
 
 // Tenant-side screens of the PG app (PRD 3, 4, 6): own details and emergency contacts, notice to vacate,
 // agreement view / accept / download, complaints with photos, and notices from the office.
@@ -16,21 +18,25 @@ export function TenantDetails() {
   const { user, profile, refreshProfile } = useAuth()
   return (
     <Load loader={() => m.rows('tenant_profiles', '*', (q) => q.eq('user_id', user.id).maybeSingle())} deps={[user.id]}>
-      {(tp, reload) => <DetailsForm tp={Array.isArray(tp) ? null : tp} profile={profile} onSaved={() => { reload(); refreshProfile?.() }} />}
+      {(tp, reload) => <DetailsForm tp={Array.isArray(tp) ? null : tp} profile={profile} accountEmail={user.email} onSaved={() => { reload(); refreshProfile?.() }} />}
     </Load>
   )
 }
 
-function DetailsForm({ tp, profile, onSaved }) {
+function DetailsForm({ tp, profile, accountEmail, onSaved }) {
   const signed = Boolean(tp?.rules_accepted_at)
-  const [kept] = useState(() => (tp ? null : readStash())) // registration filled in before email confirmation
+  const [kept] = useState(() => {
+    const stash = readStash()
+    return !tp && stash?.email?.toLowerCase() === accountEmail?.toLowerCase() ? stash : null
+  }) // never restore another account's form
   const [v, setV] = useState(() => ({ ...tenantFormValue({ ...profile, tenant_profiles: tp }), ...(kept ?? {}), full_name: profile?.full_name ?? '', phone: profile?.phone ?? '' }))
   const a = useAction()
+  const properties = useAsync(registrationProperties, [])
   const save = async (e) => {
     e.preventDefault()
     const bad = validateTenant(v) || (!signed && !v.rules_accepted ? 'Accept the rules and regulations to register' : '')
     if (bad) return a.run(() => Promise.reject(new Error(bad)))
-    if (await a.run(() => m.saveMyTenantProfile(v), 'Saved')) { clearStash(); onSaved() }
+    if (await a.run(() => !tp?.registration_state && v.property_id ? submitRegistration(v) : m.saveMyTenantProfile(v), 'Saved')) { clearStash(); onSaved(); window.dispatchEvent(new Event('focus')) }
   }
   return (
     <form onSubmit={save}>
@@ -40,6 +46,7 @@ function DetailsForm({ tp, profile, onSaved }) {
             {' '}· Police verification: <StatusBadge value={tp.police_status} /></p>
         )}
         {!tp && <div className="mb-3"><Notice tone="warn">{kept ? 'Your registration form is filled in below. Check it and press Save details to submit it.' : 'Complete the registration form, including one emergency contact and the rules, so the office can approve your registration.'}</Notice></div>}
+        {!tp?.registration_state && <Field label="Property"><select required className={inputCls} value={v.property_id ?? ''} onChange={(e) => setV({ ...v, property_id: e.target.value })}><option value="">Choose a property</option>{(properties.data ?? []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>}
         <ResidentForm value={v} onChange={setV} skip={['full_name', 'phone']} signed={signed} />
         <div className="mt-4 flex items-center gap-3"><Button type="submit" disabled={a.busy}>Save details</Button><ActionMsg action={a} /></div>
       </Card>

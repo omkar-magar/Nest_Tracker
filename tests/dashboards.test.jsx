@@ -129,7 +129,7 @@ describe('Account page', () => {
       seed()
       open()
       await userEvent.click(await screen.findByRole('button', { name: 'Cancel booking' }))
-      expect(supabase.rpc).not.toHaveBeenCalled()
+      expect(supabase.rpc).not.toHaveBeenCalledWith('cancel_booking', expect.anything())
     })
     it('shows the error if cancelling fails', async () => {
       db.rpcs.cancel_booking = { data: null, error: new Error('Already paid') }

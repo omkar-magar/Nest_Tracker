@@ -11,6 +11,8 @@ import NotificationBell from '../components/NotificationBell'
 import { GoogleReviewLink, MyAgreement, MyComplaints, NoticeToVacate, OfficeNotices, TenantDetails } from './account/TenantSections'
 import { invoicePdf, receiptPdf } from '../services/pdfDocs'
 import { owedOn } from '../services/billing'
+import { myRegistration } from '../services/registration'
+import RegistrationStatus from '../components/register/RegistrationStatus'
 
 const DOC_TYPES = { id_proof: 'ID proof', address_proof: 'Address proof', photo: 'Photo', agreement: 'Agreement', other: 'Other' }
 const billTone = { Paid: 'green', Due: 'amber', 'Part paid': 'amber', Overdue: 'red', Void: 'gray' }
@@ -144,6 +146,21 @@ function ProfileForm({ profile, onSaved }) {
 const H2 = ({ children, id }) => <h2 id={id} className="mb-3 mt-10 scroll-mt-16 text-xl font-bold">{children}</h2>
 
 export default function Account() {
+  const { user } = useAuth()
+  const registration = useAsync(myRegistration, [user.id])
+  useEffect(() => {
+    const refresh = () => registration.reload()
+    window.addEventListener('focus', refresh)
+    const timer = window.setInterval(refresh, 15000)
+    return () => { window.removeEventListener('focus', refresh); window.clearInterval(timer) }
+  }, [user.id])
+  if (registration.loading) return <Spinner label="Loading registration status" />
+  if (registration.error) return <ErrorBox error={registration.error} onRetry={registration.reload} />
+  if (registration.data?.state) return <RegistrationStatus registration={registration.data} reload={registration.reload} />
+  return <AccountDashboard />
+}
+
+function AccountDashboard() {
   const { user, profile, refreshProfile } = useAuth()
   const { state } = useLocation()
   const { data, error, loading, reload } = useAsync(() => loadMyAccount(user.id), [user.id])

@@ -428,3 +428,7 @@ verify_jwt = false
 # Called by a scheduler without a Supabase login; protected by the x-cron-secret header instead.
 [functions.run-jobs]
 verify_jwt = false
+
+# Explicitly enabled test-only demo customer login.
+[functions.demo-registration]
+verify_jwt = false

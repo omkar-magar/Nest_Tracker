@@ -134,6 +134,7 @@ export default function App() {
             <Route index element={<ManageHome />} />
             <Route path="beds" element={<Beds />} />
             <Route path="register" element={only(MANAGE, <Register />)} />
+            <Route path="registrations" element={only(MANAGE, <Navigate to="/admin/register?tab=new" replace />)} />
             <Route path="tenants" element={only(MANAGE, <Tenants />)} />
             <Route path="tenants/:id" element={only(MANAGE, <TenantDetail />)} />
             <Route path="checkin" element={only(MANAGE, <CheckIn />)} />

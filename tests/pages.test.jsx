@@ -145,8 +145,11 @@ describe('Login', () => {
 
 // ------------------------------------------------------------------ Signup
 describe('Signup', () => {
+  beforeEach(() => { db.tables.properties = { data: [{ id: 'P1', name: 'A wing' }], error: null } })
   const at = () => renderRoute(<Signup />, { path: '/signup' })
   const fill = async ({ name = ' Asha Rao ', phone = '9876543210', email = ' asha@example.com ', password = 'secret123', rules = true } = {}) => {
+    await screen.findByRole('option', { name: 'A wing' })
+    await userEvent.selectOptions(screen.getByLabelText('Property'), 'P1')
     await userEvent.type(screen.getByLabelText('Full name'), name)
     await userEvent.type(screen.getByLabelText('Mobile number'), phone)
     await userEvent.type(screen.getByLabelText('Email'), email)
