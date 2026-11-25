@@ -196,6 +196,7 @@ billing, check-in/out, RLS, complaints, sales, payroll, reports, jobs, guest reg
 | 4.5 | Overdue dashboard; late fee rules | ✔ | Rent & payments → Overdue; `apply_late_fees` |
 | 4.5 | [Should] repeat-defaulter flag | ✔ | `refresh_risk_flags` |
 | 4.6 | Extra charges, electricity fixed/split/meter, separate lines | ✔ | `staff_add_charge`, `add_electricity` |
+| 4.6+ | Electricity consumer ID per flat (A wing seeded); resident sees own on /account, office edits under Billing → Electricity | ✔ | `electricity_connections`, `my_electricity_connection` |
 | 4.6 | [Should] recurring charges | ✔ | `recurring_charges` |
 | 4.7 | Outstanding by tenant/room/property/month with ageing; export; remind | ✔ | `report_outstanding` |
 | 5.1 | Expense categories, custom categories, links to salaries / repairs / marketing | ✔ | `expense_categories`, auto-booked expenses |

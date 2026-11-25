@@ -8,7 +8,7 @@ import { billLabel, daysOverdue, summarize } from '../services/billing'
 import { cancelBooking, deleteDocument, documentUrl, loadMyAccount, submitReview, updateMyProfile, uploadDocument } from '../services/api'
 import { formatDate, formatDateTime, rupees } from '../services/format'
 import NotificationBell from '../components/NotificationBell'
-import { GoogleReviewLink, MyAgreement, MyComplaints, NoticeToVacate, OfficeNotices, TenantDetails } from './account/TenantSections'
+import { GoogleReviewLink, MyAgreement, MyComplaints, MyElectricity, NoticeToVacate, OfficeNotices, TenantDetails } from './account/TenantSections'
 import { invoicePdf, receiptPdf } from '../services/pdfDocs'
 import { owedOn } from '../services/billing'
 import { myRegistration } from '../services/registration'
@@ -209,6 +209,9 @@ function AccountDashboard() {
       <H2>Current booking</H2>
       {live && <div className="mb-3"><NoticeToVacate booking={live} onChanged={reload} /></div>}
       {live ? <BookingCard booking={live} onChanged={reload} /> : <Empty title="No current booking">Find a room on the <Link className="underline" to="/rooms">Rooms page</Link>.</Empty>}
+
+      <H2 id="electricity">Electricity bill</H2>
+      <MyElectricity />
 
       <H2>Bills</H2>
       {sum.nextBill && <div className="mb-3"><Button variant="sun" onClick={() => setPaying(sum.nextBill)}>Pay next bill · {rupees(owedOn(sum.nextBill))}</Button></div>}

@@ -114,8 +114,9 @@ function RoomsTab() {
   const [open, setOpen] = useState(null)
   return (
     <Load loader={() => Promise.all([m.loadRoomsWithBeds(property), m.rows('categories', '*', (q) => q.order('sort_order')),
-      property ? m.loadFloors(property) : m.rows('floors', '*', (q) => q.order('property_id').order('number'))])} deps={[property]}>
-      {([rooms, categories, floors], reload) => (
+      property ? m.loadFloors(property) : m.rows('floors', '*', (q) => q.order('property_id').order('number')),
+      m.loadElectricityIds(property).then(m.electricityIndex)])} deps={[property]}>
+      {([rooms, categories, floors, power], reload) => (
         <div>
           <div className="mb-4 flex flex-wrap gap-2">
             <Button onClick={() => setEditing({ property_id: property || properties[0]?.id, floor: 1, room_type: 'double', ac_type: 'AC', furnishing: 'furnished',
@@ -139,6 +140,7 @@ function RoomsTab() {
                   <div>
                     <p className="font-semibold">{r.property_id} · {r.wing} wing · Room {r.room_no} <span className="font-normal text-slate-500">floor {r.floor}</span></p>
                     <p className="text-xs text-slate-600">{label(r.room_type)} · {r.ac_type} · {r.attached_bathroom ? 'attached bath' : 'common bath'} · {label(r.furnishing)} · {rupees(r.price)}/{r.billing_period} per {r.rent_basis} · deposit {rupees(r.deposit)}</p>
+                    {power[`${r.property_id}|${r.room_no}`] && <p className="text-xs text-slate-600">Electricity consumer ID: {power[`${r.property_id}|${r.room_no}`]}</p>}
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     {!r.is_active && <Badge>Inactive</Badge>}

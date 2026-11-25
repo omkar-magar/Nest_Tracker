@@ -161,6 +161,13 @@ export const addElectricity = (a) => rpc('add_electricity', {
 export const sendReminder = (bill) => rpc('send_bill_reminder', { p_bill: bill, p_manual: true })
 export const recordDeposit = (booking, amount, mode, ref, date) =>
   rpc('record_deposit_received', { p_booking: booking, p_amount: Number(amount), p_mode: mode, p_reference: ref || null, p_date: date })
+// electricity consumer IDs per flat (residents pay the board with these); staff-only table
+export const loadElectricityIds = (pid) =>
+  rows('electricity_connections', '*', (q) => (pid ? q.eq('property_id', pid) : q).order('property_id').order('room_no'))
+export const myElectricity = () => rpc('my_electricity_connection')
+// { 'P1|101': '1706…' } for looking up a room's ID
+export const electricityIndex = (list) => Object.fromEntries((list ?? []).map((e) => [`${e.property_id}|${e.room_no}`, e.consumer_id]))
+
 export const loadMeterReadings = () => rows('meter_readings', '*, rooms(room_no, property_id)', (q) => q.order('month', { ascending: false }).limit(100))
 
 // ---------------------------------------------------------------- complaints and expenses

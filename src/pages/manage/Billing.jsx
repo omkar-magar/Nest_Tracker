@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import CrudPanel from '../../components/manage/CrudPanel'
 import DataTable from '../../components/manage/DataTable'
 import { ActionMsg, FormFields, H3, Load, Small, StatusBadge, Tabs, useAction, useScope } from '../../components/manage/kit'
 import { PaymentModal } from './TenantDetail'
@@ -132,10 +133,13 @@ function Electricity() {
   const [shares, setShares] = useState(null)
   const a = useAction()
   return (
-    <Load loader={() => Promise.all([m.loadRoomsWithBeds(property), m.loadMeterReadings()])} deps={[property]}>
-      {([rooms, readings], reload) => {
+    <>
+    <Load loader={() => Promise.all([m.loadRoomsWithBeds(property), m.loadMeterReadings(), m.loadElectricityIds(property)])} deps={[property]}>
+      {([rooms, readings, ids], reload) => {
         const occupiedRooms = rooms.filter((r) => r.beds.some((b) => b.is_occupied))
         const last = readings.find((r) => r.room_id === v.room && r.mode === 'meter')
+        const room = rooms.find((r) => r.id === v.room)
+        const consumerId = room && m.electricityIndex(ids)[`${room.property_id}|${room.room_no}`]
         const submit = async (e) => {
           e.preventDefault()
           const res = await a.run(() => m.addElectricity(v), 'Added to each tenant\'s invoice')
@@ -155,6 +159,7 @@ function Electricity() {
                   { key: 'rate', label: 'Rate per unit (₹)', type: 'number', step: 'any', hidden: (x) => x.mode !== 'meter', required: true },
                   { key: 'amount', label: (v.mode === 'fixed' ? 'Amount per tenant (₹)' : 'Total bill for the room (₹)'), type: 'number', min: 1, hidden: (x) => x.mode === 'meter', required: true },
                 ]} />
+                {room && <p className="mt-2 text-sm">Electricity consumer ID for {room.wing ? `${room.wing}-` : ''}{room.room_no}: <strong>{consumerId || 'not added yet'}</strong></p>}
                 {v.mode === 'meter' && v.prev !== '' && v.curr !== '' && v.rate !== '' && (
                   <p className="mt-2 text-sm">{Number(v.curr) - Number(v.prev)} units × ₹{v.rate} = <strong>{rupees(Math.round((Number(v.curr) - Number(v.prev)) * Number(v.rate)))}</strong>, shared by beds occupied</p>
                 )}
@@ -176,6 +181,32 @@ function Electricity() {
         )
       }}
     </Load>
+    <ConsumerIds />
+    </>
+  )
+}
+
+// Board (MSEDCL) consumer ID per flat; residents see their own on their account page
+function ConsumerIds() {
+  const { property, properties } = useScope()
+  return (
+    <div className="mt-8">
+      <H3>Electricity consumer IDs</H3>
+      <p className="mb-2 text-sm text-slate-600">Residents pay the electricity bill with their flat's consumer ID and see it on their account page.</p>
+      <CrudPanel table="electricity_connections" title="Consumer IDs" deps={[property]} addLabel="Add consumer ID"
+        query={(q) => (property ? q.eq('property_id', property) : q).order('property_id').order('room_no')}
+        defaults={{ property_id: property || properties[0]?.id }}
+        columns={[
+          { key: 'property_id', label: 'Property' }, { key: 'room_no', label: 'Flat' },
+          { key: 'consumer_id', label: 'Consumer ID' }, { key: 'note', label: 'Note' },
+        ]}
+        fields={[
+          { key: 'property_id', label: 'Property (wing)', type: 'select', required: true, options: properties.map((p) => [p.id, p.name]) },
+          { key: 'room_no', label: 'Flat number (without wing)', required: true, help: 'e.g. 101' },
+          { key: 'consumer_id', label: 'Consumer ID', required: true, help: 'Digits only, as printed on the electricity bill' },
+          { key: 'note', label: 'Note', keepEmpty: true },
+        ]} />
+    </div>
   )
 }
 

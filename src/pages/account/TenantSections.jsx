@@ -283,6 +283,26 @@ function MyComplaintCard({ c, onChanged }) {
   )
 }
 
+// The resident's flat and its electricity consumer ID, which they pay the power bill with
+export function MyElectricity() {
+  const { user } = useAuth()
+  return (
+    <Load loader={m.myElectricity} deps={[user.id]}>
+      {(e) => (!e ? <Notice>Your flat's electricity consumer ID shows here once your stay has started.</Notice> : (
+        <Card>
+          {e.consumer_id ? (
+            <>
+              <p className="text-sm text-slate-600">Flat {e.room_label} · electricity consumer ID</p>
+              <p className="mt-1 text-2xl font-semibold tracking-wide">{e.consumer_id}</p>
+              <p className="mt-2 text-sm text-slate-600">Pay your electricity bill with this consumer ID only, so the payment reaches your flat's meter.</p>
+            </>
+          ) : <p className="text-sm">The consumer ID for flat {e.room_label} has not been added yet. Ask the office.</p>}
+        </Card>
+      ))}
+    </Load>
+  )
+}
+
 export function OfficeNotices() {
   return (
     <Load loader={() => m.rows('notices', '*', (q) => q.order('created_at', { ascending: false }).limit(20))}>
