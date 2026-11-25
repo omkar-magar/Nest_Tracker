@@ -9,6 +9,7 @@ import { Button, ErrorBox, Notice, TableSkeleton } from '../../components/ui'
 import * as m from '../../services/manage'
 import { BED_STATES, addDays, bedState, label, vacancyMessage, ymd } from '../../services/pg'
 import { guestKey, guestsByRoom, loadStayingGuests } from '../../services/register'
+import { inventoryLine, loadInventory } from '../../services/inventory'
 import { brand } from '../../data/site'
 import { formatDate, rupees, whatsappLink } from '../../services/format'
 
@@ -23,6 +24,8 @@ export default function Beds() {
     manage ? m.loadOccupants() : Promise.resolve([]),
     // most current guests are kept in the guest register, not checked in through the app
     manage ? loadStayingGuests(property) : Promise.resolve([]),
+    // furniture per room (Inventory tab); the bed map still works without it
+    manage ? loadInventory(property).catch(() => []) : Promise.resolve([]),
   ]), [property, manage])
   const [bed, setBed] = useState(null)
   const [filter, setFilter] = useState('')
@@ -39,7 +42,9 @@ export default function Beds() {
 
   const view = useMemo(() => {
     if (!data.data) return null
-    const [rooms, resv, occ, staying] = data.data
+    const [rooms, resv, occ, staying, stock] = data.data
+    const furniture = {}
+    for (const s of stock) (furniture[`${s.property_id}|${s.room_no}`] ??= {})[s.item] = s.qty
     const register = guestsByRoom(staying)
     const inRegister = (r) => register[guestKey(r)] ?? []
     const occupant = Object.fromEntries(occ.map((o) => [o.bed_id, o.bookings]))
@@ -61,12 +66,13 @@ export default function Beds() {
       shown: regRooms.reduce((s, r) => s + inRegister(r).length, 0),
       rooms: regRooms.length,
     }
-    return { rooms, floors, occupant, reservation, counts, upcoming, inRegister, reg }
+    const stockOf = (r) => inventoryLine(furniture[`${r.property_id}|${r.room_no}`])
+    return { rooms, floors, occupant, reservation, counts, upcoming, inRegister, reg, stockOf }
   }, [data.data, manage])
 
   if (data.loading) return <TableSkeleton />
   if (data.error) return <ErrorBox error={data.error} onRetry={data.reload} />
-  const { floors, occupant, reservation, counts, upcoming, rooms, inRegister, reg } = view
+  const { floors, occupant, reservation, counts, upcoming, rooms, inRegister, reg, stockOf } = view
 
   const share = () => {
     const msg = vacancyMessage(rooms, { brandName: brand.name, phone: brand.phone, url: `${window.location.origin}/vacancies`, taken: (r) => inRegister(r).length })
@@ -109,6 +115,7 @@ export default function Beds() {
                       {inRegister(r).map((g) => g.name).join(', ')}
                     </p>
                   )}
+                  {stockOf(r) && <p className="mt-1 text-xs text-slate-600">Furniture: {stockOf(r)}</p>}
                   <div className="mt-2 flex flex-wrap gap-2">
                     {r.beds.sort((a, b) => a.label.localeCompare(b.label)).filter((b) => !filter || bedState(b) === filter).map((b) => {
                       const st = bedState(b)
