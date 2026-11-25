@@ -62,6 +62,21 @@ helpers in `src/services/register.js`; screens in `src/components/register/`.
    text and bad phone numbers are kept in Notes. A CSV with the export's headers works too (for the next building's Excel:
    save it as CSV).
 
+## Complaints
+Migration `20261125000002_complaint_management.sql`; screens: `/account#complaints` (resident) and `/admin/complaints` (owner, managers).
+
+| Who | Can |
+|---|---|
+| Resident | raise a complaint for their own room (booking or guest-register stay) with up to 5 images; see only their own complaints, the assigned manager and the activity; confirm a resolved complaint (with a rating) or reopen it with a reason |
+| Manager | see every complaint in both wings; take an **unassigned** complaint for themselves; on their own complaints: start work, add notes, resolution notes and images, mark resolved. Cannot assign to anyone else, change priority, close or reopen |
+| Assigned staff (`employee`) | same work actions on complaints the owner assigned to them (`/staff`) |
+| Owner (`admin`) | everything: assign, reassign or unassign, priority, any status move, close, reopen a closed complaint |
+
+Statuses: Open (stored as `new`) → Assigned → In progress → Resolved → Closed. Marking resolved needs resolution notes.
+Every action is one row in `complaint_events` (action, who, status before/after, assignee before/after, note, details);
+the table cannot be updated. Notifications: new complaint → owner and both managers; assignment → the new assignee;
+each status change → the resident (guardian copy if they consented). Board stats come from `complaint_stats()`.
+
 ## Setup
 1. Run the new migrations in order (`supabase db push`, or paste them into the SQL editor). `..._01_roles.sql` must be
    committed before the others (it adds enum values). On Render, `npm run db:migrate` applies them too; the storage file
@@ -182,7 +197,7 @@ billing, check-in/out, RLS, complaints, sales, payroll, reports, jobs, guest reg
 | 5.2 | [Should] approval above a limit | ✔ | `expense_guard`, `approve_expense` |
 | 5.3 | Property income/expense, monthly P&L, charts, PDF/Excel | ✔ | `report_profit_loss`, Reports |
 | 6.1 | Tenant complaint with photos/video, preferred time; categories; office logging | ✔ | `raise_complaint` |
-| 6.2 | Assign staff/vendor, priority, SLA; status flow + reopen | ✔ | `update_complaint` |
+| 6.2 | Assign staff/vendor, priority, SLA; status flow + reopen; managers take / owner assigns | ✔ | `update_complaint`, see Complaints |
 | 6.2 | Push to tenant and staff on each change | ◐ | queued (push needs VAPID keys); in-app inbox works |
 | 6.2 | Dashboard pending/resolved/overdue/avg time | ✔ᵘ | Complaints |
 | 6.2 | [Should] rating, escalation | ✔ | |

@@ -45,10 +45,30 @@ describe('pure helpers', () => {
     expect(pg.maskId('9012')).toBe('XXXX-XXXX-9012')
   })
   it('allows only valid complaint moves for each role', () => {
-    expect(pg.complaintMoves('new', { manage: true })).toEqual(['assigned', 'in_progress', 'resolved', 'closed'])
-    expect(pg.complaintMoves('assigned', { staff: true })).toEqual(['in_progress', 'resolved'])
+    expect(pg.complaintMoves('new', { admin: true })).toEqual(['closed'])                 // assigning is not a move
+    expect(pg.complaintMoves('assigned', { mine: true })).toEqual(['in_progress', 'resolved'])
+    expect(pg.complaintMoves('in_progress', { mine: true })).toEqual(['resolved'])        // only the admin closes
+    expect(pg.complaintMoves('assigned', {})).toEqual([])                               // another manager's complaint
     expect(pg.complaintMoves('resolved', { tenant: true })).toEqual(['closed', 'reopen'])
+    expect(pg.complaintMoves('closed', { tenant: true })).toEqual([])
+    expect(pg.complaintMoves('closed', { admin: true })).toEqual(['reopen'])
     expect(pg.complaintMoves('in_progress', { tenant: true })).toEqual([])
+  })
+  it('shows stored status new as Open and filters the complaint board', () => {
+    expect(pg.complaintStatus('new')).toBe('Open')
+    expect(pg.complaintStatus('in_progress')).toBe('In progress')
+    const list = [
+      { id: 1, status: 'new', assigned_to: null }, { id: 2, status: 'assigned', assigned_to: 'me' },
+      { id: 3, status: 'in_progress', assigned_to: 'other' }, { id: 4, status: 'resolved', assigned_to: null },
+    ]
+    const ids = (f) => pg.filterComplaints(list, f, 'me').map((c) => c.id)
+    expect(ids('all')).toEqual([1, 2, 3, 4])
+    expect(ids('unassigned')).toEqual([1])          // a resolved complaint with no assignee is not waiting
+    expect(ids('mine')).toEqual([2])
+    expect(ids('new')).toEqual([1])
+    expect(ids('in_progress')).toEqual([3])
+    expect(pg.isComplaintOverdue({ status: 'assigned', due_at: '2000-01-01T00:00:00Z' })).toBe(true)
+    expect(pg.isComplaintOverdue({ status: 'resolved', due_at: '2000-01-01T00:00:00Z' })).toBe(false)
   })
   it('scores leads hot / warm / cold by move-in date', () => {
     const today = new Date(2026, 10, 21)

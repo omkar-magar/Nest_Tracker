@@ -3,10 +3,13 @@ import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import CrudPanel from '../../components/manage/CrudPanel'
 import DataTable from '../../components/manage/DataTable'
-import { ActionMsg, Fact, FileButton, FormFields, Load, Modal, Small, StatusBadge, Tabs, useAction, useScope } from '../../components/manage/kit'
-import { Button, Stat, inputCls } from '../../components/ui'
+import { ActionMsg, Fact, FileButton, FormFields, Load, Modal, StatusBadge, Tabs, useAction, useScope } from '../../components/manage/kit'
+import { ComplaintImages, ComplaintStatusBadge, ComplaintTimeline, PriorityBadge } from '../../components/complaints/ComplaintParts'
+import { Button, Card, Field, Notice, Stat, inputCls } from '../../components/ui'
 import * as m from '../../services/manage'
-import { COMPLAINT_CATEGORIES, PRIORITIES, complaintCategory, complaintMoves, label, ymd } from '../../services/pg'
+import * as cx from '../../services/complaints'
+import { COMPLAINT_CATEGORIES, PRIORITIES, complaintCategory, complaintMoves, complaintStatus, filterComplaints, isComplaintActive,
+  isComplaintOverdue, label, ymd } from '../../services/pg'
 import { formatDate, formatDateTime, rupees } from '../../services/format'
 
 export default function Complaints() {
@@ -23,51 +26,82 @@ export default function Complaints() {
 }
 
 const hours = (c) => (c.resolved_at ? (new Date(c.resolved_at) - new Date(c.created_at)) / 36e5 : null)
-const overdue = (c) => ['new', 'assigned', 'in_progress'].includes(c.status) && c.due_at && new Date(c.due_at) < new Date()
+const fmtHours = (h) => (h === null || h === undefined ? '—' : `${h} h`)
+const where = (c) => (c.is_common_area ? `${c.property_id} · common area` : `${c.property_id} · ${c.room_label || c.rooms?.room_no || ''}`)
 
+// Both managers see every complaint in both buildings; the building filter here is only a view filter.
 function Tickets() {
-  const { property } = useScope()
+  const { user, role } = useAuth()
+  const { properties } = useScope()
   const [params, setParams] = useSearchParams()
-  const [status, setStatus] = useState('open')
+  const [building, setBuilding] = useState('')
+  const [filter, setFilter] = useState('all')
   const [logging, setLogging] = useState(() => params.get('new') === '1') // dashboard's "Raise maintenance"
+  const admin = role === 'admin'
   return (
-    <Load loader={m.loadComplaints}>
-      {(all, reload) => {
-        const list = all.filter((c) => !property || c.property_id === property)
-        const open = list.filter((c) => ['new', 'assigned', 'in_progress'].includes(c.status))
-        const resolved = list.filter((c) => c.resolved_at)
-        const avg = resolved.length ? (resolved.reduce((s, c) => s + hours(c), 0) / resolved.length).toFixed(1) : '—'
-        const rows = list.filter((c) => status === 'all' || (status === 'open' && open.includes(c)) || (status === 'overdue' && overdue(c)) || c.status === status)
+    <Load loader={() => Promise.all([cx.loadBoard(), cx.complaintStats(building), cx.complaintAssignees()])} deps={[building]}>
+      {([all, stats, people], reload) => {
+        const names = Object.fromEntries(people.map((p) => [p.id, p.full_name]))
+        const list = all.filter((c) => !building || c.property_id === building)
+        const filters = [['all', 'All'], ['unassigned', 'Unassigned'], ...(admin ? [] : [['mine', 'Assigned to me']]),
+          ...['new', 'assigned', 'in_progress', 'resolved', 'closed'].map((s) => [s, complaintStatus(s)])]
+        const rows = filterComplaints(list, filter, user.id)
         const current = all.find((c) => c.id === params.get('open'))
         return (
           <>
-            <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-              <Stat label="Pending" value={open.length} /><Stat label="Resolved / closed" value={list.length - open.length} />
-              <Stat label="Overdue" value={list.filter(overdue).length} tone={list.some(overdue) ? 'red' : undefined} />
-              <Stat label="Average resolution" value={`${avg} h`} />
+            <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-5">
+              <Stat label="Total" value={stats.total} hint={`${stats.unassigned} unassigned`} />
+              <Stat label="Pending" value={stats.pending} hint="Open or assigned" tone={stats.overdue ? 'red' : undefined} />
+              <Stat label="In progress" value={stats.in_progress} />
+              <Stat label="Resolved" value={stats.resolved} hint={`${stats.closed} closed`} />
+              <Stat label="Avg. resolution" value={fmtHours(stats.avg_resolution_hours)} hint={stats.overdue ? `${stats.overdue} overdue` : undefined} />
+            </div>
+            {stats.by_assignee.length > 0 && (
+              <Card className="mb-4 !p-4">
+                <h3 className="mb-2 text-sm font-semibold">Complaints by manager</h3>
+                <ul className="grid gap-2 sm:grid-cols-2">
+                  {stats.by_assignee.map((p) => (
+                    <li key={p.id} className="flex flex-wrap items-baseline justify-between gap-2 rounded-xl bg-cream px-3 py-2 text-sm">
+                      <span className="font-medium">{p.name}{p.role !== 'manager' && <span className="text-xs text-slate-500"> · {label(p.role)}</span>}</span>
+                      <span className="text-slate-700">{p.active} active · {p.resolved} resolved · avg {fmtHours(p.avg_hours)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            )}
+            <div role="group" aria-label="Filter complaints" className="mb-3 flex gap-2 overflow-x-auto pb-1">
+              {filters.map(([k, text]) => (
+                <button key={k} type="button" aria-pressed={filter === k} onClick={() => setFilter(k)}
+                  className={`whitespace-nowrap rounded-full border px-3 py-1 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy ${filter === k ? 'border-navy bg-navy text-white' : 'border-navy/20 text-navy hover:bg-navy/5'}`}>
+                  {text} <span className={filter === k ? 'text-white/80' : 'text-slate-500'}>{filterComplaints(list, k, user.id).length}</span>
+                </button>
+              ))}
             </div>
             <DataTable title="Complaints" rows={rows} onRowClick={(c) => setParams({ open: c.id })}
+              empty={filter === 'all' ? 'No complaints yet' : 'No complaints match this filter'}
               filters={(
                 <>
-                  <select aria-label="Status" className={`${inputCls} !w-auto`} value={status} onChange={(e) => setStatus(e.target.value)}>
-                    <option value="open">Open</option><option value="overdue">Overdue</option>
-                    {['new', 'assigned', 'in_progress', 'resolved', 'closed'].map((s) => <option key={s} value={s}>{label(s)}</option>)}<option value="all">All</option>
+                  <select aria-label="Building" className={`${inputCls} !w-auto`} value={building} onChange={(e) => setBuilding(e.target.value)}>
+                    <option value="">All buildings</option>{properties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
                   <Button className="!py-1.5" onClick={() => setLogging(true)}>Log complaint</Button>
                 </>
               )}
               columns={[
-                { key: 'ticket_no', label: '#' }, { key: 'title', label: 'Issue', render: (c) => <span className="font-medium">{c.title}{overdue(c) && <span className="ml-1 text-xs text-red-700">overdue</span>}</span>, value: (c) => c.title },
+                { key: 'ticket_no', label: '#' },
+                { key: 'title', label: 'Issue', value: (c) => c.title,
+                  render: (c) => <span className="font-medium">{c.title}{isComplaintOverdue(c) && <span className="ml-1 text-xs text-red-700">overdue</span>}{c.reopen_count > 0 && <span className="ml-1 text-xs text-slate-500">reopened</span>}</span> },
                 { key: 'category', label: 'Category', value: (c) => complaintCategory(c.category) },
-                { key: 'where', label: 'Where', value: (c) => (c.is_common_area ? `${c.property_id} common area` : `${c.property_id} · ${c.rooms?.room_no ?? ''}`) },
-                { key: 'who', label: 'Tenant', value: (c) => c.profiles?.full_name ?? '' },
-                { key: 'priority', label: 'Priority', render: (c) => <StatusBadge value={c.priority} tones={{ medium: 'amber', low: 'gray' }} />, value: (c) => c.priority },
-                { key: 'status', label: 'Status', render: (c) => <StatusBadge value={c.status} />, value: (c) => c.status },
+                { key: 'where', label: 'Where', value: where },
+                { key: 'who', label: 'Resident', value: (c) => c.profiles?.full_name ?? '' },
+                { key: 'assigned_to', label: 'Assigned to', value: (c) => (c.assigned_to ? names[c.assigned_to] ?? 'Staff' : 'Unassigned'),
+                  render: (c) => (c.assigned_to ? names[c.assigned_to] ?? 'Staff' : <span className="text-slate-500">Unassigned</span>) },
+                { key: 'priority', label: 'Priority', render: (c) => <PriorityBadge priority={c.priority} />, value: (c) => c.priority },
+                { key: 'status', label: 'Status', render: (c) => <ComplaintStatusBadge status={c.status} />, value: (c) => complaintStatus(c.status) },
                 { key: 'created_at', label: 'Raised', render: (c) => formatDateTime(c.created_at), value: (c) => c.created_at },
-                { key: 'due_at', label: 'Due', render: (c) => formatDateTime(c.due_at), value: (c) => c.due_at },
               ]} />
             {logging && <LogComplaint onClose={() => setLogging(false)} onDone={() => { setLogging(false); reload() }} />}
-            {current && <ComplaintPanel c={current} onClose={() => setParams({})} onChanged={reload} />}
+            {current && <ComplaintPanel key={current.id} c={current} people={people} names={names} onClose={() => setParams({})} onChanged={reload} />}
           </>
         )
       }}
@@ -100,68 +134,152 @@ function LogComplaint({ onClose, onDone }) {
   )
 }
 
-// PRD 6.2: assign (staff or vendor), priority, status flow with notes, cost and photos, full timeline
-function ComplaintPanel({ c, onClose, onChanged }) {
-  const { user } = useAuth()
-  const [v, setV] = useState({ assigned_to: c.assigned_to ?? '', staff_member_id: c.staff_member_id ?? '', vendor_id: c.vendor_id ?? '', priority: c.priority,
-    resolution: c.resolution, fixed_by: c.fixed_by, cost: c.cost, note: '' })
+
+// One complaint. The owner assigns, reassigns, sets priority, closes and reopens. A manager takes an unassigned
+// complaint and works only on their own. update_complaint() enforces the same rules.
+const MOVE_TEXT = {
+  in_progress: ['Start work', 'Mark this complaint as in progress?'],
+  resolved: ['Mark resolved', 'Mark this complaint as resolved? The resident will be notified.'],
+  closed: ['Close complaint', 'Close this complaint? Only the admin can reopen it after this.'],
+  reopen: ['Reopen', 'Reopen this complaint?'],
+}
+
+function ComplaintPanel({ c, people, names, onClose, onChanged }) {
+  const { user, role } = useAuth()
+  const admin = role === 'admin'
+  const mine = c.assigned_to === user.id
+  const canWork = (admin || mine) && c.status !== 'closed'
+  const [assignee, setAssignee] = useState(c.assigned_to ?? '')
+  const [priority, setPriority] = useState(c.priority)
+  const [work, setWork] = useState({ resolution: c.resolution, fixed_by: c.fixed_by, cost: c.cost, vendor_id: c.vendor_id ?? '', staff_member_id: c.staff_member_id ?? '' })
   const [after, setAfter] = useState(c.after_photos ?? [])
+  const [note, setNote] = useState('')
+  const [version, setVersion] = useState(0)
   const a = useAction()
-  const save = (extra = {}) => a.run(async () => {
-    await m.updateComplaint(c.id, { priority: v.priority, assigned_to: v.assigned_to || null, staff_member_id: v.staff_member_id || null, vendor_id: v.vendor_id || null,
-      resolution: v.resolution, fixed_by: v.fixed_by, cost: Number(v.cost || 0), after_photos: after, note: v.note, ...extra })
-    setV((x) => ({ ...x, note: '' }))
-    onChanged()
-  }, 'Saved')
-  const view = (p) => a.run(async () => window.open(await m.fileUrl('complaint-media', p), '_blank', 'noopener'))
+  const act = async (fn, msg, ask) => {
+    if (ask && !window.confirm(ask)) return
+    if (await a.run(fn, msg)) { setNote(''); setVersion((v) => v + 1); onChanged() }
+  }
+  const workFields = () => ({ ...work, cost: Number(work.cost || 0), after_photos: after })
+  const who = c.assigned_to ? names[c.assigned_to] ?? 'a staff member' : null
+
   return (
-    <Load loader={() => Promise.all([m.staffDirectory(c.property_id), m.rows('vendors', '*', (q) => q.eq('is_active', true)), m.loadComplaintEvents(c.id)])} deps={[c.id, c.status]}>
-      {([staff, vendors, events]) => (
-        <Modal title={`#${c.ticket_no} · ${c.title}`} onClose={onClose} wide>
-          <dl className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <Fact k="Status"><StatusBadge value={c.status} /></Fact><Fact k="Category">{complaintCategory(c.category)}</Fact>
-            <Fact k="Where">{c.is_common_area ? 'Common area' : `Room ${c.rooms?.room_no ?? ''} ${c.beds?.code ?? ''}`}</Fact>
-            <Fact k="Tenant">{c.profiles?.full_name}{c.profiles?.phone ? ` · ${c.profiles.phone}` : ''}</Fact>
-            <Fact k="Raised">{formatDateTime(c.created_at)}</Fact><Fact k="Expected by">{formatDateTime(c.due_at)}</Fact>
-            <Fact k="Preferred time">{c.preferred_time}</Fact><Fact k="Rating">{c.rating ? `${c.rating}/5 ${c.feedback}` : '—'}</Fact>
-          </dl>
-          {c.description && <p className="mt-3 whitespace-pre-line rounded-xl bg-cream p-3 text-sm">{c.description}</p>}
-          {c.photos?.length > 0 && <div className="mt-2 flex flex-wrap gap-2">{c.photos.map((p, i) => <Small key={p} onClick={() => view(p)}>Photo / video {i + 1}</Small>)}</div>}
-          <div className="mt-4">
-            <FormFields value={v} onChange={setV} fields={[
-              { key: 'assigned_to', label: 'Assign to staff (with app login)', type: 'select', options: staff.filter((s) => s.user_id).map((s) => [s.user_id, `${s.full_name} · ${label(s.designation)}`]) },
-              { key: 'staff_member_id', label: 'or staff without login', type: 'select', options: staff.filter((s) => !s.user_id).map((s) => [s.id, s.full_name]) },
-              { key: 'vendor_id', label: 'or external vendor', type: 'select', options: vendors.map((x) => [x.id, `${x.name} · ${x.trade}`]) },
-              { key: 'priority', label: 'Priority', type: 'select', required: true, options: PRIORITIES },
-              { key: 'fixed_by', label: 'Fixed by' }, { key: 'cost', label: 'Repair cost (₹, goes to expenses)', type: 'number', min: 0 },
-              { key: 'resolution', label: 'Work done', type: 'textarea' }, { key: 'note', label: 'Note for this update', type: 'textarea' },
-            ]} />
+    <Modal title={`#${c.ticket_no} · ${c.title}`} onClose={onClose} wide>
+      <dl className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <Fact k="Status"><ComplaintStatusBadge status={c.status} /></Fact>
+        <Fact k="Priority"><PriorityBadge priority={c.priority} /></Fact>
+        <Fact k="Category">{complaintCategory(c.category)}</Fact>
+        <Fact k="Where">{where(c)}{c.beds?.code ? ` · bed ${c.beds.code}` : ''}</Fact>
+        <Fact k="Resident">{c.profiles?.full_name ?? (c.is_common_area ? 'Common area' : '—')}{c.profiles?.phone ? ` · ${c.profiles.phone}` : ''}</Fact>
+        <Fact k="Assigned to">{who ?? 'Unassigned'}</Fact>
+        <Fact k="Raised">{formatDateTime(c.created_at)}</Fact>
+        <Fact k="Expected by">{formatDateTime(c.due_at)}{isComplaintOverdue(c) ? ' (overdue)' : ''}</Fact>
+        {c.resolved_at && <Fact k="Resolved">{formatDateTime(c.resolved_at)}</Fact>}
+        {c.preferred_time && <Fact k="Preferred time">{c.preferred_time}</Fact>}
+        {c.rating && <Fact k="Rating">{`${c.rating}/5 ${c.feedback}`}</Fact>}
+        {c.reopen_count > 0 && <Fact k="Reopened">{`${c.reopen_count} time(s)`}</Fact>}
+      </dl>
+      {c.description && <p className="mt-3 whitespace-pre-line rounded-xl bg-cream p-3 text-sm">{c.description}</p>}
+      {c.photos?.length > 0 && <div className="mt-3"><p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-500">Resident's images</p><ComplaintImages paths={c.photos} name="Resident image" /></div>}
+      {c.after_photos?.length > 0 && <div className="mt-3"><p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-500">Resolution images</p><ComplaintImages paths={c.after_photos} name="Resolution image" /></div>}
+
+      {/* assignment */}
+      <section aria-label="Assignment" className="mt-5 rounded-2xl border border-navy/10 p-4">
+        <h3 className="mb-2 font-semibold">Assignment</h3>
+        {admin ? (
+          <div className="flex flex-wrap items-end gap-2">
+            <Field label="Assign to">
+              <select className={`${inputCls} sm:!w-72`} value={assignee} onChange={(e) => setAssignee(e.target.value)} disabled={c.status === 'closed'}>
+                <option value="">Unassigned</option>
+                {people.map((p) => <option key={p.id} value={p.id}>{p.full_name} · {label(p.role)}</option>)}
+              </select>
+            </Field>
+            <Button disabled={a.busy || c.status === 'closed' || assignee === (c.assigned_to ?? '')}
+              onClick={() => act(() => cx.assignComplaint(c.id, assignee, note), 'Assignment saved',
+                assignee ? `${c.assigned_to ? 'Reassign' : 'Assign'} this complaint to ${names[assignee]}?` : `Remove ${who} from this complaint?`)}>
+              {assignee ? (c.assigned_to ? 'Reassign' : 'Assign') : 'Unassign'}
+            </Button>
+            {c.status === 'closed' && <p className="text-sm text-slate-600">Reopen the complaint to assign it.</p>}
           </div>
+        ) : !c.assigned_to ? (
+          isComplaintActive(c) ? (
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="text-sm">Nobody has taken this complaint yet.</p>
+              <Button disabled={a.busy} onClick={() => act(() => cx.takeComplaint(c.id, user.id, note), 'It is yours now', 'Take responsibility for this complaint?')}>Assign to me</Button>
+            </div>
+          ) : <p className="text-sm text-slate-600">Not assigned.</p>
+        ) : mine ? <p className="text-sm">Assigned to you.</p> : (
+          <Notice>Assigned to {who}. Only the admin can reassign it.</Notice>
+        )}
+      </section>
+
+      {/* priority (owner) */}
+      {admin && (
+        <div className="mt-3 flex flex-wrap items-end gap-2">
+          <Field label="Priority">
+            <select className={`${inputCls} !w-40`} value={priority} onChange={(e) => setPriority(e.target.value)}>
+              {PRIORITIES.map((p) => <option key={p} value={p}>{label(p)}</option>)}
+            </select>
+          </Field>
+          <Button variant="outline" disabled={a.busy || priority === c.priority} onClick={() => act(() => cx.setComplaintPriority(c.id, priority), 'Priority saved')}>Save priority</Button>
+        </div>
+      )}
+
+      {/* work (owner or the assignee) */}
+      {canWork && (
+        <WorkForm c={c} work={work} setWork={setWork} after={after} setAfter={setAfter} userId={user.id} action={a}
+          onSave={() => act(() => cx.saveComplaintWork(c.id, workFields()), 'Work details saved')} />
+      )}
+
+      {/* status and notes */}
+      {(admin || mine) && (
+        <div className="mt-4">
+          <Field label="Note for this update (shown in the timeline)">
+            <textarea rows={2} className={inputCls} value={note} maxLength={2000} onChange={(e) => setNote(e.target.value)} />
+          </Field>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {complaintMoves(c.status, { admin, mine }).map((s) => (
+              <Button key={s} variant={s === 'closed' ? 'outline' : 'primary'} disabled={a.busy}
+                onClick={() => act(() => cx.moveComplaint(c.id, s, note, s === 'resolved' && canWork ? workFields() : {}), `${MOVE_TEXT[s][0]} done`, MOVE_TEXT[s][1])}>
+                {MOVE_TEXT[s][0]}
+              </Button>
+            ))}
+            <Button variant="outline" disabled={a.busy || !note.trim()} onClick={() => act(() => cx.commentOnComplaint(c.id, note), 'Note added')}>Add note</Button>
+          </div>
+        </div>
+      )}
+      <div className="mt-2"><ActionMsg action={a} /></div>
+
+      <h3 className="mb-2 mt-6 font-semibold">Activity</h3>
+      <ComplaintTimeline id={c.id} version={version} />
+    </Modal>
+  )
+}
+
+function WorkForm({ c, work, setWork, after, setAfter, userId, action, onSave }) {
+  return (
+    <Load loader={() => Promise.all([m.staffDirectory(c.property_id), m.rows('vendors', 'id, name, trade', (q) => q.eq('is_active', true))])} deps={[c.property_id]}>
+      {([staff, vendors]) => (
+        <section aria-label="Resolution" className="mt-4 rounded-2xl border border-navy/10 p-4">
+          <h3 className="mb-2 font-semibold">Resolution</h3>
+          <FormFields value={work} onChange={setWork} fields={[
+            { key: 'resolution', label: 'Resolution notes (needed to mark it resolved)', type: 'textarea', maxLength: 2000 },
+            { key: 'fixed_by', label: 'Fixed by' }, { key: 'cost', label: 'Repair cost (₹, goes to expenses)', type: 'number', min: 0 },
+            { key: 'vendor_id', label: 'External vendor', type: 'select', options: (vendors ?? []).map((x) => [x.id, `${x.name}${x.trade ? ` · ${x.trade}` : ''}`]) },
+            { key: 'staff_member_id', label: 'Staff without app login', type: 'select', options: (staff ?? []).filter((s) => !s.user_id).map((s) => [s.id, s.full_name]) },
+          ]} />
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <FileButton label="Add after photos" accept="image/*,video/*" multiple onFile={(files) => a.run(async () => {
-              const paths = []
-              for (const f of files) paths.push(await m.uploadFile('complaint-media', user.id, f))
-              setAfter((x) => [...x, ...paths])
-            })} />
-            {after.map((p, i) => <Small key={p} onClick={() => view(p)}>After {i + 1}</Small>)}
+            <FileButton label="Add resolution images" accept="image/jpeg,image/png,image/webp" multiple busy={action.busy}
+              onFile={(files) => action.run(async () => {
+                const bad = cx.checkImages(files, after.length, 10)
+                if (bad) throw new Error(bad)
+                const paths = await cx.uploadImages(userId, files)
+                setAfter((x) => [...x, ...paths])
+              }, 'Images uploaded. Save to attach them.')} />
+            {after.length > c.after_photos.length && <span className="text-sm">{after.length - c.after_photos.length} new image(s) not saved yet</span>}
+            <Button variant="outline" disabled={action.busy} onClick={onSave}>Save work details</Button>
           </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Button onClick={() => save()} disabled={a.busy}>Save</Button>
-            {complaintMoves(c.status, { manage: true }).map((s) => (
-              <Button key={s} variant="outline" disabled={a.busy} onClick={() => save({ status: s })}>{s === 'reopen' ? 'Reopen' : `Mark ${label(s).toLowerCase()}`}</Button>
-            ))}
-          </div>
-          <div className="mt-2"><ActionMsg action={a} /></div>
-          <h3 className="mb-2 mt-6 font-semibold">Timeline</h3>
-          <ol className="space-y-1 text-sm">
-            {events.map((e) => (
-              <li key={e.id} className="border-l-2 border-gold pl-3">
-                <span className="text-xs text-slate-500">{formatDateTime(e.created_at)} · {e.profiles?.full_name ?? 'System'}</span>
-                <p>{e.from_status && e.from_status !== e.to_status ? `${label(e.from_status)} → ` : ''}{label(e.to_status)}{e.note ? ` · ${e.note}` : ''}</p>
-              </li>
-            ))}
-          </ol>
-        </Modal>
+        </section>
       )}
     </Load>
   )

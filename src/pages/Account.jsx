@@ -261,7 +261,7 @@ function AccountDashboard() {
       )}
 
       <H2 id="complaints">Complaints</H2>
-      <MyComplaints hasStay={live?.status === 'active'} />
+      <MyComplaints />
 
       <H2 id="agreement">Rental agreement</H2>
       <MyAgreement />

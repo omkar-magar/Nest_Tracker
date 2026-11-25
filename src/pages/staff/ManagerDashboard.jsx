@@ -150,7 +150,7 @@ function OpenComplaints() {
         const open = list.filter((c) => OPEN.includes(c.status))
         return (
           <div>
-            <H3 action={<Button to="/admin/complaints" variant="outline">Assign and manage</Button>}>Open complaints ({open.length})</H3>
+            <H3 action={<Button to="/admin/complaints" variant="outline">Open complaint board</Button>}>Open complaints ({open.length})</H3>
             <DataTable title="Open complaints" rows={open} empty="No open complaints" columns={[
               { key: 'ticket_no', label: 'Ticket', render: (c) => `#${c.ticket_no}` },
               { key: 'title', label: 'Issue', value: (c) => `${c.title} ${complaintCategory(c.category)}`, render: (c) => <>{c.title}<span className="block text-xs text-slate-500">{complaintCategory(c.category)}</span></> },

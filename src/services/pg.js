@@ -45,22 +45,38 @@ export const ENQUIRY_STATUSES = ['new', 'contacted', 'interested', 'visit_schedu
 export const LOST_REASONS = ['price', 'location', 'food', 'found_elsewhere', 'not_reachable', 'facilities', 'other']
 export const LEAD_SOURCES = ['website', 'app', 'google_ads', 'google_business', 'facebook', 'instagram', 'whatsapp', 'call', 'walk_in',
   'justdial', 'broker', 'referral', 'hoarding', 'pamphlet', 'college_tieup', 'corporate_tieup', 'other']
-export const COMPLAINT_CATEGORIES = ['electrical', 'plumbing', 'wifi', 'housekeeping', 'food', 'ac_appliances', 'furniture', 'security', 'noise', 'other']
-export const COMPLAINT_LABELS = { wifi: 'Wi-Fi / Internet', ac_appliances: 'AC / Appliances', food: 'Food / Mess', noise: 'Noise / Neighbour' }
+export const COMPLAINT_CATEGORIES = ['electrical', 'plumbing', 'wifi', 'housekeeping', 'maintenance', 'food', 'ac_appliances', 'furniture', 'security', 'noise', 'other']
+// the short list residents choose from
+export const RESIDENT_COMPLAINT_CATEGORIES = ['plumbing', 'electrical', 'housekeeping', 'wifi', 'maintenance', 'other']
+export const COMPLAINT_LABELS = { electrical: 'Electricity', housekeeping: 'Cleaning', wifi: 'Wi-Fi', ac_appliances: 'AC / Appliances', food: 'Food / Mess', noise: 'Noise / Neighbour' }
 export const complaintCategory = (c) => COMPLAINT_LABELS[c] ?? label(c)
+// the database keeps 'new'; people see "Open"
+export const COMPLAINT_STATUSES = ['new', 'assigned', 'in_progress', 'resolved', 'closed']
+export const complaintStatus = (s) => (s === 'new' ? 'Open' : label(s))
+export const isComplaintActive = (c) => ['new', 'assigned', 'in_progress'].includes(c.status)
+export const isComplaintOverdue = (c, now = new Date()) => isComplaintActive(c) && Boolean(c.due_at) && new Date(c.due_at) < now
+
+// Board filters: all | unassigned | mine | new (Open) | assigned | in_progress | resolved | closed
+export function filterComplaints(list, filter, userId) {
+  if (filter === 'all') return list
+  if (filter === 'unassigned') return list.filter((c) => !c.assigned_to && isComplaintActive(c))
+  if (filter === 'mine') return list.filter((c) => c.assigned_to === userId)
+  return list.filter((c) => c.status === filter)
+}
 export const PRIORITIES = ['low', 'medium', 'high', 'urgent']
 export const CHARGE_KINDS = ['electricity', 'ac', 'laundry', 'food', 'parking', 'maintenance', 'wifi', 'fine', 'damage', 'other']
 export const ID_TYPES = ['aadhaar', 'driving_licence', 'passport', 'voter_id', 'college_id', 'company_id', 'pan', 'other']
 export const PAY_MODES = ['cash', 'upi', 'bank_transfer', 'cheque']
 
-// Next allowed complaint moves (the database enforces the same flow)
-export function complaintMoves(status, { manage, staff, tenant }) {
+// Next allowed complaint moves; update_complaint() enforces the same rules.
+// admin: the owner. mine: the complaint is assigned to this login. tenant: the resident who raised it.
+// Assignment is not a move: it happens by assigning (admin) or taking (manager).
+export function complaintMoves(status, { admin, mine, tenant }) {
   const m = []
-  if (manage && ['new', 'in_progress'].includes(status)) m.push('assigned')
-  if ((manage || staff) && ['new', 'assigned'].includes(status)) m.push('in_progress')
-  if ((manage || staff) && ['new', 'assigned', 'in_progress'].includes(status)) m.push('resolved')
-  if ((manage && status !== 'closed') || (tenant && status === 'resolved')) m.push('closed')
-  if (['resolved', 'closed'].includes(status)) m.push('reopen')
+  if ((admin || mine) && status === 'assigned') m.push('in_progress')
+  if ((admin || mine) && ['assigned', 'in_progress'].includes(status)) m.push('resolved')
+  if ((admin && status !== 'closed') || (tenant && status === 'resolved')) m.push('closed')
+  if ((admin && ['resolved', 'closed'].includes(status)) || (tenant && status === 'resolved')) m.push('reopen')
   return m
 }
 

@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
-import { ActionMsg, FileButton, FormFields, Load, StatusBadge, useAction } from '../../components/manage/kit'
+import { ActionMsg, FileButton, Load, StatusBadge, useAction } from '../../components/manage/kit'
 import ResidentForm from '../../components/manage/ResidentForm'
 import { clearStash, readStash, tenantFormValue, validateTenant } from '../../components/manage/tenantFields'
 import { Button, Card, Empty, Field, Notice, inputCls } from '../../components/ui'
 import * as m from '../../services/manage'
-import { COMPLAINT_CATEGORIES, addDays, complaintCategory, complaintMoves, ymd } from '../../services/pg'
+import { RESIDENT_COMPLAINT_CATEGORIES, addDays, complaintCategory, complaintStatus, ymd } from '../../services/pg'
+import * as cx from '../../services/complaints'
+import { ComplaintImages, ComplaintStatusBadge, ComplaintTimeline } from '../../components/complaints/ComplaintParts'
 import { agreementPdf } from '../../services/pdfDocs'
 import { formatDate, formatDateTime } from '../../services/format'
 import useAsync from '../../hooks/useAsync'
@@ -112,65 +114,172 @@ export function MyAgreement() {
   )
 }
 
-export function MyComplaints({ hasStay }) {
+// Residents raise complaints for their own room, follow them through the steps, and confirm or reopen them.
+// my_complaints() only returns the signed-in resident's own complaints.
+export function MyComplaints() {
   const { user } = useAuth()
-  const [v, setV] = useState({ category: 'electrical', title: '', description: '', preferred_time: '' })
-  const [files, setFiles] = useState([])
-  const [rate, setRate] = useState({})
-  const a = useAction()
   return (
-    <Load loader={() => m.rows('complaints', '*', (q) => q.eq('customer_id', user.id).order('created_at', { ascending: false }).limit(50))} deps={[user.id]}>
-      {(list, reload) => (
+    <Load loader={() => Promise.all([cx.myComplaintPlace(), cx.myComplaints()])} deps={[user.id]}>
+      {([place, list], reload) => (
         <div className="space-y-4">
-          {hasStay ? (
-            <Card>
-              <FormFields value={v} onChange={setV} fields={[
-                { key: 'category', label: 'Category', type: 'select', required: true, options: COMPLAINT_CATEGORIES.map((c) => [c, complaintCategory(c)]) },
-                { key: 'preferred_time', label: 'Best time to visit your room' },
-                { key: 'title', label: 'What is wrong? (short)', required: true, span: true }, { key: 'description', label: 'Details', type: 'textarea' },
-              ]} />
-              <div className="mt-3 flex flex-wrap items-center gap-3">
-                <FileButton label="Add photos / video" accept="image/*,video/*" multiple onFile={(fs) => setFiles((x) => [...x, ...fs])} />
-                <span className="text-sm">{files.length ? `${files.length} file(s)` : ''}</span>
-              </div>
-              <Button className="mt-3" disabled={a.busy || !v.title.trim()} onClick={async () => {
-                const ok = await a.run(async () => {
-                  const photos = []
-                  for (const f of files) photos.push(await m.uploadFile('complaint-media', user.id, f))
-                  await m.raiseComplaint({ ...v, photos })
-                }, 'Complaint raised. You will be notified at every step.')
-                if (ok) { setV({ category: 'electrical', title: '', description: '', preferred_time: '' }); setFiles([]); reload() }
-              }}>Raise complaint</Button>
-              <div className="mt-2"><ActionMsg action={a} /></div>
-            </Card>
-          ) : <Notice>You can raise complaints once your stay has started.</Notice>}
-          {list.map((c) => (
-            <Card key={c.id} className="!p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="font-semibold">#{c.ticket_no} {c.title}</p><StatusBadge value={c.status} />
-              </div>
-              <p className="text-xs text-slate-500">{complaintCategory(c.category)} · raised {formatDateTime(c.created_at)}{c.resolution ? ` · ${c.resolution}` : ''}</p>
-              {complaintMoves(c.status, { tenant: true }).length > 0 && (
-                <div className="mt-2 flex flex-wrap items-end gap-2">
-                  {c.status === 'resolved' && (
-                    <>
-                      <label className="text-sm">Rating <select className="rounded border border-navy/20" value={rate[c.id] ?? 5} onChange={(e) => setRate({ ...rate, [c.id]: e.target.value })}>
-                        {[5, 4, 3, 2, 1].map((n) => <option key={n}>{n}</option>)}</select></label>
-                      <Button variant="outline" className="!py-1" onClick={async () => (await a.run(() => m.updateComplaint(c.id, { status: 'closed', rating: Number(rate[c.id] ?? 5) }))) && reload()}>Confirm fixed</Button>
-                    </>
-                  )}
-                  <Button variant="danger" className="!py-1" onClick={async () => {
-                    const note = window.prompt('What is still wrong?')
-                    if (note !== null && await a.run(() => m.updateComplaint(c.id, { status: 'reopen', note }))) reload()
-                  }}>Reopen</Button>
-                </div>
-              )}
-              {c.rating && <p className="mt-1 text-xs">Your rating: {c.rating}/5</p>}
-            </Card>
-          ))}
+          {place ? <RaiseComplaint userId={user.id} place={place} onDone={reload} /> : <Notice>You can raise complaints once your stay has started.</Notice>}
+          {list.length === 0
+            ? (place && <Empty title="No complaints yet">If something is not working, tell us above and a manager will pick it up.</Empty>)
+            : <ul className="space-y-3">{list.map((c) => <li key={c.id}><MyComplaintCard c={c} onChanged={reload} /></li>)}</ul>}
         </div>
       )}
     </Load>
+  )
+}
+
+const EMPTY_COMPLAINT = { category: '', title: '', description: '', preferred_time: '' }
+
+function RaiseComplaint({ userId, place, onDone }) {
+  const [v, setV] = useState(EMPTY_COMPLAINT)
+  const [files, setFiles] = useState([])
+  const a = useAction()
+  const addFiles = (fs) => {
+    const bad = cx.checkImages(fs, files.length)
+    if (bad) return a.run(() => Promise.reject(new Error(bad)))
+    a.clear(); setFiles((x) => [...x, ...fs])
+  }
+  const submit = async (e) => {
+    e.preventDefault()
+    const bad = !v.category ? 'Choose a category' : v.title.trim().length < 3 ? 'Give the complaint a short title (3 characters or more)'
+      : !v.description.trim() ? 'Describe the problem' : ''
+    if (bad) return a.run(() => Promise.reject(new Error(bad)))
+    const ok = await a.run(() => cx.raiseMyComplaint(userId, v, files), 'Complaint submitted. You will be notified at every step.')
+    if (ok) { setV(EMPTY_COMPLAINT); setFiles([]); onDone() }
+  }
+  return (
+    <Card>
+      <form onSubmit={submit} noValidate>
+        <h3 className="mb-1 font-semibold">Raise a complaint</h3>
+        <p className="mb-3 text-sm text-slate-600">For room {place.room_label || 'your room'}. The admin and managers are notified straight away.</p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Category *">
+            <select required className={inputCls} value={v.category} onChange={(e) => setV({ ...v, category: e.target.value })}>
+              <option value="">Choose a category</option>
+              {RESIDENT_COMPLAINT_CATEGORIES.map((c) => <option key={c} value={c}>{complaintCategory(c)}</option>)}
+            </select>
+          </Field>
+          <Field label="Best time to visit your room">
+            <input className={inputCls} maxLength={120} value={v.preferred_time} onChange={(e) => setV({ ...v, preferred_time: e.target.value })} placeholder="e.g. after 6 pm" />
+          </Field>
+          <div className="sm:col-span-2">
+            <Field label="Title *">
+              <input required className={inputCls} maxLength={120} value={v.title} onChange={(e) => setV({ ...v, title: e.target.value })} placeholder="e.g. Bathroom tap leaking" />
+            </Field>
+          </div>
+          <div className="sm:col-span-2">
+            <Field label="Description *">
+              <textarea required rows={4} className={inputCls} maxLength={2000} value={v.description} onChange={(e) => setV({ ...v, description: e.target.value })}
+                placeholder="What is wrong, where exactly, and since when?" />
+            </Field>
+          </div>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <FileButton label="Add images (optional)" accept="image/jpeg,image/png,image/webp" multiple busy={a.busy} onFile={addFiles} />
+          <span className="text-xs text-slate-500">Up to {cx.MAX_IMAGES} JPG, PNG or WebP images, {cx.MAX_IMAGE_MB} MB each</span>
+        </div>
+        {files.length > 0 && (
+          <ul className="mt-2 flex flex-wrap gap-2">
+            {files.map((f, i) => (
+              <li key={`${f.name}-${i}`} className="flex items-center gap-1 rounded-full bg-cream px-3 py-1 text-xs">
+                {f.name}
+                <button type="button" aria-label={`Remove ${f.name}`} onClick={() => setFiles((x) => x.filter((_, j) => j !== i))}
+                  className="rounded-full px-1 text-slate-600 hover:text-navy focus-visible:outline-2 focus-visible:outline-navy">×</button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <Button type="submit" disabled={a.busy}>{a.busy ? 'Submitting…' : 'Submit complaint'}</Button>
+          <ActionMsg action={a} />
+        </div>
+      </form>
+    </Card>
+  )
+}
+
+const STEPS = ['new', 'assigned', 'in_progress', 'resolved', 'closed']
+function ComplaintSteps({ status }) {
+  const at = STEPS.indexOf(status)
+  return (
+    <ol aria-label={`Progress: ${complaintStatus(status)}`} className="mt-3 flex flex-wrap gap-x-1 gap-y-1 text-xs">
+      {STEPS.map((s, i) => (
+        <li key={s} aria-current={i === at ? 'step' : undefined}
+          className={`rounded-full px-2.5 py-0.5 ${i < at ? 'bg-navy/10 text-navy' : i === at ? 'bg-navy font-semibold text-white' : 'bg-slate-100 text-slate-600'}`}>
+          {complaintStatus(s)}
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+function MyComplaintCard({ c, onChanged }) {
+  const [open, setOpen] = useState(false)
+  const [reopening, setReopening] = useState(false)
+  const [reason, setReason] = useState('')
+  const [rating, setRating] = useState('5')
+  const a = useAction()
+  const done = async (fn, msg, ask) => {
+    if (ask && !window.confirm(ask)) return
+    if (await a.run(fn, msg)) { setReopening(false); setReason(''); onChanged() }
+  }
+  return (
+    <Card className="!p-4">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <p className="font-semibold">#{c.ticket_no} {c.title}</p>
+        <ComplaintStatusBadge status={c.status} />
+      </div>
+      <p className="text-xs text-slate-500">
+        {complaintCategory(c.category)}{c.room_label ? ` · room ${c.room_label}` : ''} · raised {formatDateTime(c.created_at)}
+        {c.reopen_count > 0 ? ` · reopened ${c.reopen_count}×` : ''}
+      </p>
+      <p className="mt-1 text-sm">{c.assignee_name ? <>Handled by <strong>{c.assignee_name}</strong></> : <span className="text-slate-600">Waiting for a manager to pick it up</span>}</p>
+      <ComplaintSteps status={c.status} />
+      {c.description && <p className="mt-3 whitespace-pre-line text-sm text-slate-700">{c.description}</p>}
+      {c.photos?.length > 0 && <div className="mt-2"><ComplaintImages paths={c.photos} name="Your image" /></div>}
+      {c.resolution && ['resolved', 'closed'].includes(c.status) && (
+        <div className="mt-3 rounded-xl bg-cream p-3 text-sm">
+          <p className="font-medium">How it was fixed</p>
+          <p className="whitespace-pre-line">{c.resolution}</p>
+          {c.after_photos?.length > 0 && <div className="mt-2"><ComplaintImages paths={c.after_photos} name="Resolution image" /></div>}
+        </div>
+      )}
+
+      {c.status === 'resolved' && !reopening && (
+        <div className="mt-3 flex flex-wrap items-end gap-2">
+          <Field label="How did we do?">
+            <select className={`${inputCls} !w-28`} value={rating} onChange={(e) => setRating(e.target.value)}>
+              {[5, 4, 3, 2, 1].map((n) => <option key={n} value={n}>{n} / 5</option>)}
+            </select>
+          </Field>
+          <Button variant="outline" disabled={a.busy} onClick={() => done(() => cx.confirmFixed(c.id, rating), 'Thanks! Complaint closed.', 'Confirm the issue is fixed and close this complaint?')}>Confirm fixed</Button>
+          <Button variant="danger" disabled={a.busy} onClick={() => setReopening(true)}>Still not fixed</Button>
+        </div>
+      )}
+      {reopening && (
+        <div className="mt-3">
+          <Field label="What is still wrong? *">
+            <textarea rows={2} className={inputCls} maxLength={2000} value={reason} onChange={(e) => setReason(e.target.value)} />
+          </Field>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Button variant="danger" disabled={a.busy || !reason.trim()} onClick={() => done(() => cx.reopenComplaint(c.id, reason.trim()), 'Complaint reopened', 'Reopen this complaint?')}>Reopen complaint</Button>
+            <Button variant="outline" onClick={() => { setReopening(false); setReason('') }}>Cancel</Button>
+          </div>
+        </div>
+      )}
+      {c.rating && <p className="mt-2 text-xs">Your rating: {c.rating}/5</p>}
+      <div className="mt-2"><ActionMsg action={a} /></div>
+
+      <button type="button" aria-expanded={open} onClick={() => setOpen((x) => !x)}
+        className="mt-3 text-sm font-medium text-navy underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-navy">
+        {open ? 'Hide activity' : 'Show activity'}
+      </button>
+      {open && <div className="mt-2"><ComplaintTimeline id={c.id} version={c.updated_at} /></div>}
+    </Card>
   )
 }
 

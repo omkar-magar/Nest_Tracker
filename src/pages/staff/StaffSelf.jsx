@@ -96,7 +96,7 @@ export function MyComplaints() {
                       { key: 'note', label: 'Work note', type: 'textarea' }, { key: 'resolution', label: 'What was fixed' }, { key: 'cost', label: 'Material cost (₹)', type: 'number', min: 0 },
                     ]} />
                     <div className="flex flex-wrap gap-2">
-                      {complaintMoves(c.status, { staff: true }).map((s) => (
+                      {complaintMoves(c.status, { mine: true }).map((s) => (
                         <Button key={s} variant="outline" disabled={a.busy} onClick={async () => {
                           const n = notes[c.id] ?? {}
                           if (await a.run(() => m.updateComplaint(c.id, { status: s, note: n.note ?? '', resolution: n.resolution ?? c.resolution, cost: Number(n.cost ?? c.cost ?? 0) }))) reload()
