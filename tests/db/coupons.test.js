@@ -95,3 +95,19 @@ describe('enquiry approached', () => {
     expect(await one('select status, approached_at is not null a from public.enquiries where id = $1', [id])).toEqual({ status: 'contacted', a: true })
   })
 })
+
+describe('coming back for a new registration', () => {
+  it('starts without the coupon used on the previous registration', async () => {
+    // guest was approved above with WELCOME500 (now fully used); they check out and register again
+    await db.query("update public.register_guests set checked_out_on = check_in where customer_id = $1", [guest])
+    const free = (await one("select public.registration_rooms('P1', 'pg') -> 0 ->> 'room_no' k")).k
+    await submit(guest, free)
+    expect(await reg(guest)).toMatchObject({ state: 'pending', coupon_code: null, discount: 0, to_pay: 14000 })
+  })
+  it('keeps the coupon when the same waiting registration is sent again', async () => {
+    const code = await create(owner, { kind: 'flat', value: 300, property_id: 'P1' })
+    await apply(other, code)
+    await submit(other, room2, '9811112222')
+    expect(await reg(other)).toMatchObject({ coupon_code: code, discount: 300 })
+  })
+})
