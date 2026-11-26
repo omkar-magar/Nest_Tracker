@@ -3,9 +3,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { as, freshDb, makeUser } from './pg'
 
 let db, guest, other, manager, outsider, room
+const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
 const submit = () => as(db, guest, ({ q }) => q('select public.submit_resident_registration($1)', [JSON.stringify({
   property_id: 'P1', full_name: 'Demo Customer', email: 'customer@yolonest.test', phone: '9800000000',
   emergency1_name: 'Parent', emergency1_phone: '9800000001', rules_accepted: true,
+  stay_type: 'pg', room_no: room, move_in_date: today, due_day: 5,
 })]))
 const status = (who = guest) => as(db, who, ({ one }) => one('select public.my_registration() s')).then((r) => r.s)
 const approve = (who = manager, patch = {}) => as(db, who, ({ one }) => one('select public.approve_resident_registration($1, $2) id', [guest, JSON.stringify({

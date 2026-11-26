@@ -18,21 +18,33 @@ beforeEach(() => {
 })
 
 describe('demo registration and resident states', () => {
-  it('fills the form and accepts a nonnumeric demo OTP through the trusted demo login', async () => {
+  it('accepts a nonnumeric demo OTP first, then fills the demo form for the guest to finish', async () => {
     const auth = setAuth()
     db.fnResult = { data: { token_hash: 'demo-hash' }, error: null }
+    db.rpcs.registration_rooms = { data: [{ room_no: 'A-101', floor: 1, free: 1, beds: 2 }] }
     supabase.auth.verifyOtp = vi.fn(async () => ({ data: { session: {} }, error: null }))
     at(<Signup />)
-    await screen.findByRole('option', { name: 'A wing' })
-    fireEvent.click(screen.getByRole('button', { name: 'Fill demo registration' }))
-    expect(screen.getByLabelText('Email')).toHaveValue('customer@yolonest.test')
-    expect(screen.getByLabelText(/I have read, understood/)).toBeChecked()
-    fireEvent.click(screen.getByRole('button', { name: 'Continue to verification' }))
-    fireEvent.change(await screen.findByLabelText('Demo OTP'), { target: { value: 'x' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Verify demo OTP and register' }))
-    await waitFor(() => expect(supabase.rpc).toHaveBeenCalledWith('submit_resident_registration', { p: expect.objectContaining({ email: 'customer@yolonest.test', property_id: 'P1' }) }))
-    expect(auth.signUp).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Use the demo account' }))
+    fireEvent.change(screen.getByLabelText('Demo OTP'), { target: { value: 'x' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Verify demo OTP' }))
+    expect(await screen.findByLabelText(/I have read, understood/)).toBeChecked()
     expect(supabase.auth.verifyOtp).toHaveBeenCalledWith({ token_hash: 'demo-hash', type: 'email' })
+    expect(auth.signUp).not.toHaveBeenCalled()
+    expect(await screen.findByLabelText('Property')).toHaveValue('P1')
+    fireEvent.change(await screen.findByLabelText('Room *'), { target: { value: 'A-101' } })
+    fireEvent.change(screen.getByLabelText('Move-in date *'), { target: { value: '2099-01-05' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send registration and continue to payment' }))
+    await waitFor(() => expect(supabase.rpc).toHaveBeenCalledWith('submit_resident_registration', { p: expect.objectContaining({
+      email: 'customer@yolonest.test', property_id: 'P1', room_no: 'A-101', due_day: 5 }) }))
+  })
+  it('shows a sent registration waiting for payment with the chosen stay', async () => {
+    asRole('customer')
+    db.rpcs.my_registration = { data: { state: 'pending', approval: 'pending', stay_type: 'pg', room_no: 'A-101', move_in_date: '2099-01-20',
+      due_day: 4, first_due: '2099-02-04', payment_status: 'waiting', payment_mode: 'online', amount_due: 14000, stays: [] } }
+    at(<Account />)
+    expect(await screen.findByText(/Waiting for payment/)).toBeInTheDocument()
+    expect(screen.getByText('PG (monthly)')).toBeInTheDocument()
+    expect(screen.getByText('₹14,000')).toBeInTheDocument()
   })
   it.each([
     ['pending', /Waiting for manager’s approval/],

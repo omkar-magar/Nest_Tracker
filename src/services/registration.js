@@ -56,12 +56,23 @@ export const demoRegistration = () => ({
   rules_accepted: true, rules_signature: 'Demo Customer',
 })
 
-// Registration payment: taken on the signup form before the OTP, so it is keyed by email (no account yet).
-// Only the demo provider can take it for now; the owner sets the amount in Settings (0 = none).
-export const registrationFee = () => rpc('registration_fee')
-export async function payRegistration({ email, phone, propertyId }, outcome) {
-  const order = await rpc('start_registration_payment', { p_email: email, p_phone: phone || '', p_property: propertyId || null })
-  return rpc('demo_complete_registration_payment', { p_id: order.id, p_outcome: outcome })
+// Stay choice on the registration form. Prices live in Settings (stay_prices); the database works out the amount.
+export const STAY_TYPES = [['pg', 'PG (monthly)'], ['flat', 'Flat (monthly)'], ['pg_daily', 'PG daily'], ['flat_daily', 'Flat daily']]
+export const stayLabel = (t) => STAY_TYPES.find(([k]) => k === t)?.[1] ?? t ?? ''
+export const isDaily = (t) => t === 'pg_daily' || t === 'flat_daily'
+export const stayQuote = (type, from, to) => rpc('stay_quote', { p_type: type, p_from: from || null, p_to: to || null })
+export const registrationRooms = (pid, type) => rpc('registration_rooms', { p_property: pid, p_type: type })
+const dayOf = (ymd) => Number(String(ymd).slice(8, 10))
+// joining on the 1st-10th makes the joining day the due day (same rule as the database)
+export const dueDayFor = (moveIn, chosen) => (moveIn && dayOf(moveIn) <= 10 ? dayOf(moveIn) : Number(chosen) || null)
+export function firstDue(moveIn, dueDay) {
+  if (!moveIn) return null
+  const [y, m, d] = moveIn.split('-').map(Number)
+  const pad = (n) => String(n).padStart(2, '0')
+  const ny = m === 12 ? y + 1 : y
+  const nm = m === 12 ? 1 : m + 1
+  if (d <= 10) return `${ny}-${pad(nm)}-${pad(d)}`
+  return dueDay ? `${ny}-${pad(nm)}-${pad(dueDay)}` : null
 }
 
 // Real signups: Supabase emails a 6-digit code (the template needs {{ .Token }}); the link in the same email works too.

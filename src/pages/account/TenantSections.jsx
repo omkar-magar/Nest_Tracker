@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { ActionMsg, FileButton, Load, StatusBadge, useAction } from '../../components/manage/kit'
 import ResidentForm from '../../components/manage/ResidentForm'
@@ -10,9 +11,6 @@ import * as cx from '../../services/complaints'
 import { ComplaintImages, ComplaintStatusBadge, ComplaintTimeline } from '../../components/complaints/ComplaintParts'
 import { agreementPdf } from '../../services/pdfDocs'
 import { formatDate, formatDateTime } from '../../services/format'
-import useAsync from '../../hooks/useAsync'
-import { registrationFee, registrationProperties, submitRegistration } from '../../services/registration'
-import RegistrationPayment from '../../components/register/RegistrationPayment'
 
 // Tenant-side screens of the PG app (PRD 3, 4, 6): own details and emergency contacts, notice to vacate,
 // agreement view / accept / download, complaints with photos, and notices from the office.
@@ -34,16 +32,12 @@ function DetailsForm({ tp, profile, accountEmail, onSaved }) {
   }) // never restore another account's form
   const [v, setV] = useState(() => ({ ...tenantFormValue({ ...profile, tenant_profiles: tp }), ...(kept ?? {}), full_name: profile?.full_name ?? '', phone: profile?.phone ?? '' }))
   const a = useAction()
-  const properties = useAsync(registrationProperties, [])
-  const fee = useAsync(registrationFee, [])
-  // submitting a registration needs the registration payment first (normally made on the signup page)
-  const needPay = !tp?.registration_state && Boolean(v.property_id) && fee.data > 0 && !v.payment_id
+  // registering (stay, room, payment) happens on the registration form; this only keeps the details current
   const save = async (e) => {
     e.preventDefault()
-    if (needPay) return a.run(() => Promise.reject(new Error('Pay the registration amount first')))
     const bad = validateTenant(v) || (!signed && !v.rules_accepted ? 'Accept the rules and regulations to register' : '')
     if (bad) return a.run(() => Promise.reject(new Error(bad)))
-    if (await a.run(() => !tp?.registration_state && v.property_id ? submitRegistration(v) : m.saveMyTenantProfile(v), 'Saved')) { clearStash(); onSaved(); window.dispatchEvent(new Event('focus')) }
+    if (await a.run(() => m.saveMyTenantProfile(v), 'Saved')) { clearStash(); onSaved(); window.dispatchEvent(new Event('focus')) }
   }
   return (
     <form onSubmit={save}>
@@ -52,12 +46,9 @@ function DetailsForm({ tp, profile, accountEmail, onSaved }) {
           <p className="mb-3 text-sm">Registration: <StatusBadge value={tp.approval_status} />{tp.approval_note && ` · ${tp.approval_note}`}
             {' '}· Police verification: <StatusBadge value={tp.police_status} /></p>
         )}
-        {!tp && <div className="mb-3"><Notice tone="warn">{kept ? 'Your registration form is filled in below. Check it and press Save details to submit it.' : 'Complete the registration form, including one emergency contact and the rules, so the office can approve your registration.'}</Notice></div>}
-        {!tp?.registration_state && <Field label="Property"><select required className={inputCls} value={v.property_id ?? ''} onChange={(e) => setV({ ...v, property_id: e.target.value })}><option value="">Choose a property</option>{(properties.data ?? []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>}
+        {!tp?.registration_state && <div className="mb-3"><Notice tone="warn">To choose your room and register, use the <Link className="font-semibold underline" to="/signup">registration form</Link>.</Notice></div>}
         <ResidentForm value={v} onChange={setV} skip={['full_name', 'phone']} signed={signed} />
-        {needPay && <div className="mt-4"><RegistrationPayment amount={fee.data} email={accountEmail} phone={v.phone} propertyId={v.property_id}
-          onPaid={(p) => setV((x) => ({ ...x, payment_id: p.id }))} /></div>}
-        <div className="mt-4 flex items-center gap-3"><Button type="submit" disabled={a.busy || needPay}>Save details</Button><ActionMsg action={a} /></div>
+        <div className="mt-4 flex items-center gap-3"><Button type="submit" disabled={a.busy}>Save details</Button><ActionMsg action={a} /></div>
       </Card>
     </form>
   )

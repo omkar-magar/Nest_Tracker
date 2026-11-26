@@ -20,6 +20,7 @@ beforeAll(async () => {
   room = (await db.query("select wing || '-' || room_no k from public.rooms where property_id = 'P1' and is_active limit 1")).rows[0].k
   await as(db, guest, ({ q }) => q('select public.submit_resident_registration($1)', [JSON.stringify({
     property_id: 'P1', full_name: 'Amit', phone: '9800000000', emergency1_name: 'Parent', emergency1_phone: '9800000001', rules_accepted: true,
+    stay_type: 'pg', room_no: room, move_in_date: new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }), due_day: 5,
   })]))
 }, 120000)
 afterAll(async () => { await db?.close() })

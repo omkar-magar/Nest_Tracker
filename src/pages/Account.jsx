@@ -168,10 +168,10 @@ export default function Account() {
   // approved residents get the full dashboard; waiting, declined or ended registrations see their status
   if (registration.data?.state === 'active') return <AccountDashboard registration={registration.data} />
   if (registration.data?.state) return <RegistrationStatus registration={registration.data} reload={registration.reload} />
-  return <AccountDashboard />
+  return <AccountDashboard unregistered />
 }
 
-function AccountDashboard({ registration }) {
+function AccountDashboard({ registration, unregistered }) {
   const { user, profile, refreshProfile } = useAuth()
   const { state } = useLocation()
   const { data, error, loading, reload } = useAsync(() => loadMyAccount(user.id), [user.id])
@@ -211,6 +211,7 @@ function AccountDashboard({ registration }) {
         <h1 className="text-2xl font-bold">Hi {profile?.full_name || 'there'}</h1>
         <NotificationBell />
       </div>
+      {unregistered && <div className="mt-4"><Notice tone="warn">You have not sent your registration form yet. <Link className="font-semibold underline" to="/signup">Fill in the registration form</Link> to choose your room.</Notice></div>}
       {state?.justBooked && <div className="mt-4"><Notice tone="ok">Your beds are reserved. Pay the bills below to confirm your booking.</Notice></div>}
       {resident && <div className="mt-4"><Notice tone="ok">Your registration is approved. Welcome to YOLO Nest!</Notice></div>}
 

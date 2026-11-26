@@ -1,20 +1,15 @@
 // @vitest-environment node
-// Registration payment before OTP, the resident's stay dashboard, and extra-furniture requests (PGlite).
+// Registration, the resident's stay dashboard, and extra-furniture requests (PGlite).
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { as, freshDb, makeUser } from './pg'
 
-let db, guest, other, manager, outsider, room, guestEmail, otherEmail
+let db, guest, other, manager, outsider, room
 const form = (extra = {}) => JSON.stringify({
-  property_id: 'P1', full_name: 'Amit', phone: '9800000000', emergency1_name: 'Parent', emergency1_phone: '9800000001', rules_accepted: true, ...extra,
+  property_id: 'P1', full_name: 'Amit', phone: '9800000000', emergency1_name: 'Parent', emergency1_phone: '9800000001', rules_accepted: true,
+  stay_type: 'pg', room_no: room.k, move_in_date: new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }), due_day: 5, ...extra,
 })
 const submit = (who, extra) => as(db, who, ({ q }) => q('select public.submit_resident_registration($1)', [form(extra)]))
-// anonymous visitor on the signup page, before any account exists
-const pay = async (email, outcome = 'success') => {
-  const order = await as(db, null, ({ one }) => one("select public.start_registration_payment($1, '9800000000', 'P1') r", [email])).then((x) => x.r)
-  return as(db, null, ({ one }) => one('select public.demo_complete_registration_payment($1, $2) r', [order.id, outcome])).then((x) => x.r)
-}
 const stay = (who = guest) => as(db, who, ({ one }) => one('select public.my_stay() s')).then((x) => x.s)
-const emailOf = async (id) => (await db.query('select email from auth.users where id = $1', [id])).rows[0].email
 
 beforeAll(async () => {
   db = await freshDb()
@@ -24,41 +19,14 @@ beforeAll(async () => {
   outsider = await makeUser(db, 'manager', 'Rahul')
   await db.query("insert into public.property_members(property_id, user_id) values ('P1', $1), ('P2', $2)", [manager, outsider])
   room = (await db.query("select wing || '-' || room_no k, room_no from public.rooms where property_id = 'P1' and is_active order by room_no limit 1")).rows[0]
-  guestEmail = await emailOf(guest)
-  otherEmail = await emailOf(other)
 }, 120000)
 afterAll(async () => { await db?.close() })
 
-describe('registration payment before OTP', () => {
-  it('uses the fee from settings and lets an anonymous visitor pay with the demo provider', async () => {
-    expect(await as(db, null, ({ one }) => one('select public.registration_fee() f')).then((x) => x.f)).toBe(1000)
-    expect(await pay(guestEmail, 'failure')).toMatchObject({ status: 'failed', amount: 1000, is_simulated: true })
-  })
-  it('refuses a registration without a succeeded payment for the same email', async () => {
-    await expect(submit(guest)).rejects.toThrow(/Pay the registration amount/)
-    const failed = (await db.query("select id from public.registration_payments where status = 'failed' limit 1")).rows[0].id
-    await expect(submit(guest, { payment_id: failed })).rejects.toThrow(/Pay the registration amount/)
-    await expect(submit(guest, { payment_id: 'not-a-uuid' })).rejects.toThrow(/Pay the registration amount/)
-    const othersPay = await pay(otherEmail)
-    await expect(submit(guest, { payment_id: othersPay.id })).rejects.toThrow(/Pay the registration amount/)
-  })
-  it('claims the payment once and shows it to the resident and the wing manager only', async () => {
-    const p = await pay(guestEmail.toUpperCase())
-    await submit(guest, { payment_id: p.id })
-    await submit(guest, { payment_id: p.id }) // resubmitting the same pending registration is fine
+describe('registration', () => {
+  it('sends the registration without any payment before the OTP', async () => {
+    await submit(guest)
     const reg = await as(db, guest, ({ one }) => one('select public.my_registration() r')).then((x) => x.r)
-    expect(reg).toMatchObject({ state: 'pending', payment: { amount: 1000, status: 'succeeded', is_simulated: true } })
-    expect(await as(db, manager, ({ q }) => q('select amount from public.registration_payments where customer_id = $1', [guest]))).toEqual([{ amount: 1000 }])
-    expect(await as(db, outsider, ({ q }) => q('select 1 from public.registration_payments where customer_id = $1', [guest]))).toEqual([])
-    expect(await as(db, other, ({ q }) => q('select 1 from public.registration_payments where customer_id = $1', [guest]))).toEqual([])
-  })
-  it('refuses payments when demo payments are off, and needs none when the fee is 0', async () => {
-    await db.query("update public.app_settings set value = 'false' where key = 'demo_payments_enabled'")
-    await expect(pay(otherEmail)).rejects.toThrow(/not available yet/)
-    await db.query("update public.app_settings set value = 'true' where key = 'demo_payments_enabled'")
-    await db.query("update public.app_settings set value = '0' where key = 'registration_fee'")
-    await expect(pay(otherEmail)).rejects.toThrow(/No registration payment/)
-    await db.query("update public.app_settings set value = '1000' where key = 'registration_fee'")
+    expect(reg).toMatchObject({ state: 'pending', stay_type: 'pg', room_no: room.k, payment_status: 'waiting', payment_mode: 'online' })
   })
 })
 

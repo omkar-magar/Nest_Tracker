@@ -3,10 +3,12 @@ import { RULES, TENANT_SECTIONS } from './tenantFields'
 
 // The paper Resident Registration Form on screen: sections 1-5, then the rules (6) with the sign-off.
 // `skip` hides fields the page already asks elsewhere (e.g. name and phone on the account page).
-export default function ResidentForm({ value, onChange, skip = [], signed = false }) {
+// `slots` puts the page's own content in place of a section, keyed by section title.
+export default function ResidentForm({ value, onChange, skip = [], signed = false, slots = {} }) {
   return (
     <div className="space-y-6">
       {TENANT_SECTIONS.map((s) => {
+        if (slots[s.title]) return <div key={s.title}>{slots[s.title]}</div>
         const fields = s.fields.filter((f) => !skip.includes(f.key))
         return fields.length === 0 ? null : (
           <section key={s.title} aria-label={s.title}>
