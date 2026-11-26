@@ -49,12 +49,12 @@ describe('admin_registrations', () => {
 
   it('moves to living with the room and approver, and logs the approval', async () => {
     await as(db, manager, ({ q }) => q('select public.approve_resident_registration($1, $2)', [guest, JSON.stringify({
-      room_no: room, rent: 6000, deposit: 6000, due_date: '2026-12-03', check_in: '2026-11-25',
+      room_no: room, rent: 6000, deposit: 6000, due_date: '2026-12-03', check_in: '2026-11-25', payment_mode: 'offline', payment_status: 'paid',
     })]))
     const r = row(await regs(), guest)
     expect(r).toMatchObject({ stage: 'living', room_no: room, approved_by: 'Priya' })
     const log = (await db.query("select actor_id, details from public.activity_log where action = 'tenant.approval' and entity_id = $1", [guest])).rows
-    expect(log).toEqual([{ actor_id: manager, details: { status: 'approved', room_no: room, property_id: 'P1' } }])
+    expect(log).toEqual([{ actor_id: manager, details: expect.objectContaining({ status: 'approved', room_no: room, property_id: 'P1', payment_mode: 'offline', payment_status: 'paid' }) }])
   })
 })
 
@@ -69,6 +69,7 @@ describe('admin_recent_activity', () => {
   })
 
   it('lists rent marked paid with its amount under money', async () => {
+    await as(db, manager, ({ q }) => q("update public.register_guests set rent_status = 'pending' where customer_id = $1", [guest]))
     await as(db, manager, ({ q }) => q("update public.register_guests set rent_status = 'paid' where customer_id = $1", [guest]))
     const f = await feed()
     expect(f.money.items[0]).toMatchObject({ kind: 'rent_paid', name: 'Amit', detail: `Room ${room}`, amount: 6000, property_id: 'P1' })

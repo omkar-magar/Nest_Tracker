@@ -97,7 +97,7 @@ describe('demo registration and resident states', () => {
     at(<NewRegistrations pid="P1" onApproved={approved} />)
     fireEvent.click(await screen.findByRole('button', { name: 'Review and approve' }))
     await screen.findByRole('option', { name: 'A-101' })
-    for (const [label, value] of [['Room *', 'A-101'], ['Monthly rent (₹) *', '6000'], ['Deposit (₹) *', '6000'], ['Rent due date *', '2026-12-03']]) {
+    for (const [label, value] of [['Room *', 'A-101'], ['Monthly rent (₹) *', '6000'], ['Deposit (₹) *', '6000'], ['First rent due date *', '2026-12-03']]) {
       fireEvent.change(screen.getByLabelText(label), { target: { value } })
     }
     fireEvent.change(screen.getByLabelText('Check-in *'), { target: { value: '2026-11-25' } })
@@ -114,6 +114,42 @@ describe('demo registration and resident states', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Approve and add to guest register' }))
     await waitFor(() => expect(approved).toHaveBeenCalled())
     expect(supabase.rpc).toHaveBeenCalledWith('approve_resident_registration', { p_user: 'c1', p: expect.objectContaining({ room_no: 'A-101', rent: '6000', due_date: '2026-12-03' }) })
+  })
+  it('lets the guest pay the stay online with the offline note, then shows it as paid', async () => {
+    asRole('customer')
+    const waiting = { state: 'pending', approval: 'pending', stay_type: 'pg', room_no: 'A-101', move_in_date: '2099-01-20', due_day: 4,
+      payment_status: 'waiting', payment_mode: 'online', amount_due: 14000, amount_paid: 0, stays: [] }
+    db.rpcs.my_registration = { data: waiting }
+    db.rpcs.start_my_registration_payment = { data: { id: 'p1', amount: 14000 } }
+    db.rpcs.demo_complete_my_registration_payment = { data: { id: 'p1', status: 'succeeded', amount: 14000 } }
+    at(<Account />)
+    expect(await screen.findByText(/Ask your manager if you want to pay offline, or wait if you have already paid offline/)).toBeInTheDocument()
+    db.rpcs.my_registration = { data: { ...waiting, payment_status: 'paid', amount_paid: 14000 } }
+    fireEvent.click(screen.getByRole('button', { name: 'Pay ₹14,000 (demo success)' }))
+    expect(await screen.findByText(/Payment of ₹14,000 received/)).toBeInTheDocument()
+    expect(supabase.rpc).toHaveBeenCalledWith('demo_complete_my_registration_payment', { p_id: 'p1', p_outcome: 'success' })
+  })
+  it('makes the manager wait for an online payment, or switch to offline and record what was collected', async () => {
+    db.tables.tenant_profiles = { data: [{ user_id: 'c1', property_id: 'P1', stay_type: 'pg', room_no: 'A-101', move_in_date: '2099-01-20', due_day: 4,
+      payment_mode: 'online', payment_status: 'waiting', amount_due: 14000, amount_paid: 0, profiles: { full_name: 'Asha', phone: '9800000000' } }] }
+    db.tables.rooms = { data: [{ room_no: '101', wing: 'A' }] }
+    db.rpcs.stay_quote = { data: { daily: false, rent: 7000, deposit: 7000, amount: 14000 } }
+    db.rpcs.approve_resident_registration = { data: 1 }
+    at(<NewRegistrations pid="P1" onApproved={vi.fn()} />)
+    expect(await screen.findByText('Waiting for payment')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Review and approve' }))
+    await waitFor(() => expect(screen.getByLabelText('Monthly rent (₹) *')).toHaveValue(7000))
+    expect(screen.getByLabelText('Room *')).toHaveValue('A-101')
+    expect(screen.getByLabelText('First rent due date *')).toHaveValue('2099-02-04')
+    const approve = screen.getByRole('button', { name: 'Approve and add to guest register' })
+    expect(approve).toBeDisabled()
+    fireEvent.change(screen.getByLabelText('Payment *'), { target: { value: 'offline' } })
+    fireEvent.change(screen.getByLabelText('Collected *'), { target: { value: 'partially_paid' } })
+    fireEvent.change(screen.getByLabelText('Amount received (₹) *'), { target: { value: '5000' } })
+    expect(screen.getByText(/added to the guest's first rent/)).toBeInTheDocument()
+    fireEvent.click(approve)
+    await waitFor(() => expect(supabase.rpc).toHaveBeenCalledWith('approve_resident_registration', { p_user: 'c1', p: expect.objectContaining({
+      payment_mode: 'offline', payment_status: 'partially_paid', amount_paid: '5000', rent: '7000', deposit: '7000' }) }))
   })
   it('revalidates checkout when check-in changes and allows blank or same-day checkout', () => {
     expect(registrationStayError({ check_in: '2026-11-25', expected_checkout: '' })).toBe('')

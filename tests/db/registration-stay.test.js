@@ -85,3 +85,58 @@ describe('submit', () => {
     expect(await reg(other)).toMatchObject({ stay_type: 'flat_daily', checkout_date: '2099-01-22', due_day: null, amount_due: 7000 })
   })
 })
+
+describe('payment and approval', () => {
+  const approve = (who, user, extra = {}) => as(db, who, ({ one: o }) => o('select public.approve_resident_registration($1, $2) id', [user, JSON.stringify({
+    room_no: room, rent: 7000, deposit: 7000, due_date: '2099-02-04', check_in: '2099-01-20', room_type: 'pg', ...extra })])).then((x) => x.id)
+  const payOnline = async (who, outcome = 'success') => {
+    const order = await as(db, who, ({ one: o }) => o('select public.start_my_registration_payment() r')).then((x) => x.r)
+    return as(db, who, ({ one: o }) => o('select public.demo_complete_my_registration_payment($1, $2) r', [order.id, outcome])).then((x) => x.r)
+  }
+  const guestRow = (user) => one('select * from public.register_guests where customer_id = $1 and checked_out_on is null', [user])
+
+  it('will not approve an online registration before it is paid', async () => {
+    await submit(guest, { move_in_date: '2099-01-20', due_day: 4 })
+    await expect(approve(manager, guest)).rejects.toThrow(/Waiting for the online payment/)
+  })
+  it('takes the online payment, marks it paid, tells the managers, then approves', async () => {
+    expect(await payOnline(guest, 'failure')).toMatchObject({ status: 'failed' })
+    expect(await reg()).toMatchObject({ payment_status: 'waiting', amount_paid: 0 })
+    expect(await payOnline(guest)).toMatchObject({ status: 'succeeded', amount: 14000, is_simulated: true })
+    expect(await reg()).toMatchObject({ payment_status: 'paid', amount_paid: 14000 })
+    await expect(payOnline(guest)).rejects.toThrow(/Nothing left to pay/)
+    const paid = await one("select body from public.notifications where kind = 'registration' and subject = 'Registration paid' and user_id = $1", [manager])
+    expect(paid.body).toMatch(/paid ₹14000 online/)
+    await approve(manager, guest)
+    expect(await reg()).toMatchObject({ state: 'active', payment_status: 'paid' })
+    expect(await guestRow(guest)).toMatchObject({ stay_type: 'pg', rent_status: 'paid', deposit_status: 'paid', carry_forward: 0 })
+  })
+  it('lets the manager switch to offline and approve with a part payment; the rest goes into the first rent', async () => {
+    await expect(payOnline(other, 'success').then(() => null)).resolves.toBeNull() // other has a daily flat registration
+    // a fresh guest who has not paid
+    const late = await makeUser(db, 'customer', 'Ravi')
+    const free = (await as(db, null, ({ one: o }) => o("select public.registration_rooms('P1', 'pg') r")).then((x) => x.r))[0].room_no
+    await submit(late, { room_no: free, move_in_date: '2099-01-20', due_day: 4 })
+    await expect(approve(manager, late, { room_no: free, payment_mode: 'offline', payment_status: 'partially_paid', amount_paid: 0 }))
+      .rejects.toThrow(/Enter the amount received/)
+    await approve(manager, late, { room_no: free, payment_mode: 'offline', payment_status: 'partially_paid', amount_paid: 10000 })
+    expect(await reg(late)).toMatchObject({ state: 'active', payment_mode: 'offline', payment_status: 'partially_paid', amount_paid: 10000 })
+    expect(await guestRow(late)).toMatchObject({ rent_status: 'partially_paid', carry_forward: 4000 })
+    const s = await as(db, late, ({ one: o }) => o('select public.my_stay() s')).then((x) => x.s)
+    expect(s.carry_forward).toBe(4000)
+    const told = await one("select body from public.notifications where subject = 'Registration approved' and user_id = $1", [late])
+    expect(told.body).toMatch(/₹4000 still to pay/)
+  })
+  it('approves offline with nothing paid yet (pending)', async () => {
+    const pend = await makeUser(db, 'customer', 'Sita')
+    const free = (await as(db, null, ({ one: o }) => o("select public.registration_rooms('P1', 'pg') r")).then((x) => x.r))[0].room_no
+    await submit(pend, { room_no: free, move_in_date: '2099-01-20', due_day: 4 })
+    await approve(manager, pend, { room_no: free, payment_mode: 'offline', payment_status: 'pending', amount_paid: 500 })
+    expect(await guestRow(pend)).toMatchObject({ rent_status: 'pending', carry_forward: 14000 })
+  })
+  it('shows the payment state on the owner registrations view', async () => {
+    const owner = await makeUser(db, 'admin', 'Owner')
+    const r = await as(db, owner, ({ one: o }) => o('select public.admin_registrations() r')).then((x) => x.r)
+    expect(r.rows.find((x) => x.id === other)).toMatchObject({ stage: 'waiting', payment: 'paid', stay_type: 'flat_daily', room_no: flat })
+  })
+})

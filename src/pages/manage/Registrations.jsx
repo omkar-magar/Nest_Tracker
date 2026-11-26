@@ -74,7 +74,8 @@ export default function Registrations() {
                   <div className="min-w-0">
                     <p className="font-semibold">{r.name || 'No name'} <span className="text-sm font-normal text-slate-600">{r.phone}</span></p>
                     <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-600">
-                      <Badge tone={TONES[r.stage]}>{STAGE_LABEL[r.stage]}</Badge>
+                      <Badge tone={TONES[r.stage]}>{r.stage === 'waiting' && r.payment === 'waiting' ? 'Waiting for payment' : STAGE_LABEL[r.stage]}</Badge>
+                      {r.stage === 'waiting' && r.payment && r.payment !== 'waiting' && <Badge tone={r.payment === 'paid' ? 'green' : 'amber'}>{r.payment_mode === 'offline' ? 'Offline · ' : ''}{r.payment === 'paid' ? 'Paid' : r.payment === 'partially_paid' ? 'Partly paid' : 'Payment pending'}</Badge>}
                       <span>{r.property_id ? wingName(r.property_id) : 'No wing picked'}</span>
                       {r.room_no && <span>· Room {r.room_no}</span>}
                       <span>· {r.submitted_at ? `sent ${formatDateTime(r.submitted_at)}` : `signed up ${formatDateTime(r.signed_up_at)}`}</span>
@@ -98,7 +99,7 @@ export default function Registrations() {
                         {at && <span className="text-slate-600"> · {formatDateTime(at)}</span>}
                       </li>
                     ))}
-                    {r.stage === 'waiting' && <li className="text-sm text-slate-600">Next: a manager approves it with a room, rent and dates</li>}
+                    {r.stage === 'waiting' && <li className="text-sm text-slate-600">{r.payment === 'waiting' ? 'Next: the guest pays online, or a manager switches the payment to offline and approves' : 'Next: a manager approves it with a room, rent and dates'}</li>}
                   </ol>
                 )}
               </li>

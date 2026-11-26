@@ -13,6 +13,7 @@ import { invoicePdf, receiptPdf } from '../services/pdfDocs'
 import { owedOn } from '../services/billing'
 import { myRegistration } from '../services/registration'
 import RegistrationStatus from '../components/register/RegistrationStatus'
+import RegistrationPay from '../components/register/RegistrationPay'
 import MyStay from './account/MyStay'
 
 const DOC_TYPES = { id_proof: 'ID proof', address_proof: 'Address proof', photo: 'Photo', agreement: 'Agreement', other: 'Other' }
@@ -167,7 +168,11 @@ export default function Account() {
   if (registration.error && !registration.data) return <ErrorBox error={registration.error} onRetry={registration.reload} />
   // approved residents get the full dashboard; waiting, declined or ended registrations see their status
   if (registration.data?.state === 'active') return <AccountDashboard registration={registration.data} />
-  if (registration.data?.state) return <RegistrationStatus registration={registration.data} reload={registration.reload} />
+  if (registration.data?.state) {
+    return <RegistrationStatus registration={registration.data} reload={registration.reload}>
+      <RegistrationPay registration={registration.data} onChanged={registration.reload} />
+    </RegistrationStatus>
+  }
   return <AccountDashboard unregistered />
 }
 

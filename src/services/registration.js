@@ -81,3 +81,10 @@ export async function verifyEmailCode(email, token) {
   if (error) throw error
   return data
 }
+
+// Paying the registration online from the account page (demo provider: the payer picks the outcome).
+export async function payMyRegistration(outcome) {
+  const order = await rpc('start_my_registration_payment')
+  return rpc('demo_complete_my_registration_payment', { p_id: order.id, p_outcome: outcome })
+}
+export const registrationBalance = (r) => Math.max((r?.amount_due ?? 0) - (r?.amount_paid ?? 0), 0)

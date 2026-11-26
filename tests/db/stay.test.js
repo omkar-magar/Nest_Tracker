@@ -40,7 +40,7 @@ describe('resident stay and extra furniture', () => {
     const due = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 5)).toISOString().slice(0, 10)
     await db.query("insert into public.room_inventory (property_id, room_no, item, qty) values ('P1', $1, 'pillow', 3) on conflict (property_id, room_no, item) do update set qty = 3", [room.room_no])
     await as(db, manager, ({ q }) => q('select public.approve_resident_registration($1, $2)', [guest, JSON.stringify({
-      room_no: room.k, rent: 6000, deposit: 6000, due_date: due, check_in: due })]))
+      room_no: room.k, rent: 6000, deposit: 6000, due_date: due, check_in: due, payment_mode: 'offline', payment_status: 'paid' })]))
     const s = await stay()
     expect(s).toMatchObject({ room_no: room.k, rent: 6000, deposit: 6000, inventory: expect.objectContaining({ pillow: 3 }),
       addon_prices: { chair: 100, table: 400, cupboard: 500 } })

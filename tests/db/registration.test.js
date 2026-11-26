@@ -11,7 +11,7 @@ const submit = () => as(db, guest, ({ q }) => q('select public.submit_resident_r
 })]))
 const status = (who = guest) => as(db, who, ({ one }) => one('select public.my_registration() s')).then((r) => r.s)
 const approve = (who = manager, patch = {}) => as(db, who, ({ one }) => one('select public.approve_resident_registration($1, $2) id', [guest, JSON.stringify({
-  room_no: room, rent: 6000, deposit: 6000, due_date: '2026-12-03', check_in: '2026-11-25', ...patch,
+  room_no: room, rent: 6000, deposit: 6000, due_date: '2026-12-03', check_in: '2026-11-25', payment_mode: 'offline', payment_status: 'paid', ...patch,
 })])).then((r) => r.id)
 
 beforeAll(async () => {
