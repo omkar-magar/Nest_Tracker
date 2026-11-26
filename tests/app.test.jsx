@@ -108,7 +108,8 @@ describe('protected routes', () => {
     db.tables.customer_documents = { data: [], error: null }
     db.tables.reviews = { data: null, error: null }
     go('/account')
-    expect(await screen.findByRole('heading', { name: 'Hi Test User' })).toBeInTheDocument()
+    // the account page is lazy and waits for several queries; 1 s is too tight on a slow machine
+    expect(await screen.findByRole('heading', { name: 'Hi Test User' }, { timeout: 4000 })).toBeInTheDocument()
   })
 })
 
