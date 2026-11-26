@@ -59,6 +59,14 @@ describe('demo registration and resident states', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Refresh status' }))
     expect(await screen.findByText(/Room A-101 · Removed/)).toBeInTheDocument()
   })
+  it('points an ended stay to Register again', async () => {
+    asRole('customer')
+    db.rpcs.my_registration = { data: { state: 'ended', stays: [] } }
+    at(<Account />)
+    expect(await screen.findByText(/To stay with us again, use Register again below/)).toBeInTheDocument()
+    expect(screen.queryByText(/get help from your manager/)).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Register again' })).toHaveAttribute('href', '/signup')
+  })
   it('opens the full resident dashboard once approved: stay, rent this month and next, room items and extras', async () => {
     asRole('customer')
     db.rpcs.my_registration = { data: { state: 'active', payment: { amount: 1000, status: 'succeeded', is_simulated: true, paid_at: '2026-11-20T10:00:00Z' }, stays: [] } }

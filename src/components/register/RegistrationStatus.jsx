@@ -4,7 +4,7 @@ import { isDaily, stayLabel } from '../../services/registration'
 
 export function statusMessage(r) {
   if (r.state === 'active') return ['ok', 'Your registration is approved. Welcome to YOLO Nest!']
-  if (r.state === 'ended') return ['warn', 'Thank you for staying with us! Your stay has ended. To extend your stay or return, please get help from your manager.']
+  if (r.state === 'ended') return ['warn', 'Thank you for staying with us! Your stay has ended. To stay with us again, use Register again below.']
   if (r.approval === 'rejected') return ['warn', 'Your registration needs attention. Please contact your manager.']
   if (r.state === 'pending' && r.stay_type && r.payment_mode === 'online' && r.payment_status !== 'paid') return ['warn', 'Waiting for payment. Your registration has been received.']
   if (r.state === 'pending' && r.payment_status === 'paid') return ['warn', 'Payment received. Waiting for manager’s approval.']
