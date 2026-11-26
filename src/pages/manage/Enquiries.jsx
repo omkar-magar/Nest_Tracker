@@ -2,30 +2,45 @@ import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import useAsync from '../../hooks/useAsync'
 import DataTable from '../../components/manage/DataTable'
-import { ActionMsg, FileButton, FormFields, Modal, StatusBadge, Tabs, useAction, useScope } from '../../components/manage/kit'
+import { ActionMsg, FileButton, FormFields, Modal, Small, StatusBadge, Tabs, useAction, useScope } from '../../components/manage/kit'
 import { Button, ErrorBox, Notice, TableSkeleton, inputCls } from '../../components/ui'
 import * as m from '../../services/manage'
 import { ENQUIRY_STATUSES, LEAD_SOURCES, LOST_REASONS, label } from '../../services/pg'
 import { exportCSV, parseCSV } from '../../services/exporters'
-import { formatDate, formatDateTime } from '../../services/format'
+import { formatDate, formatDateTime, rupees } from '../../services/format'
 import { useAuth } from '../../context/AuthContext'
 import Coupons from '../../components/manage/Coupons'
+import CouponForm from '../../components/manage/CouponForm'
+import { couponValue, couponWhatsapp } from '../../services/coupons'
 
 const RAW_COLUMNS = ['received_at', 'name', 'phone', 'email', 'property_id', 'room_type', 'budget', 'move_in', 'source', 'message', 'status', 'lost_reason', 'temperature']
+
+// Not approached = still new, nothing sent yet. Approached = called, messaged or sent a coupon (moves on its own).
+export const isApproached = (e) => e.status !== 'new' || Boolean(e.approached_at) || Boolean(e.coupon_code)
+const SORTS = [
+  ['newest', 'Newest first', (a, b) => b.received_at.localeCompare(a.received_at)],
+  ['oldest', 'Oldest first', (a, b) => a.received_at.localeCompare(b.received_at)],
+  ['budget_high', 'Budget: high to low', (a, b) => (b.budget ?? -1) - (a.budget ?? -1)],
+  ['budget_low', 'Budget: low to high', (a, b) => (a.budget ?? Infinity) - (b.budget ?? Infinity)],
+]
 
 export default function Enquiries() {
   const { property } = useScope()
   const { role } = useAuth()
   const data = useAsync(() => Promise.all([m.loadEnquiries(), m.loadStaffLogins(), m.loadMyFollowUps()]), [])
-  const [view, setView] = useState('list')
-  const [f, setF] = useState({ status: '', source: '', assigned: '', from: '', to: '' })
+  const [view, setView] = useState('new')
+  const [f, setF] = useState({ status: '', source: '', assigned: '', from: '', to: '', min: '', max: '', sort: 'newest' })
   const [adding, setAdding] = useState(false)
   const [importing, setImporting] = useState(false)
+  const [coupon, setCoupon] = useState(null)
   const navigate = useNavigate()
+  const canCoupon = ['admin', 'manager'].includes(role)
 
   const rows = useMemo(() => (data.data?.[0] ?? []).filter((e) => (!property || e.property_id === property)
     && (!f.status || e.status === f.status) && (!f.source || e.source === f.source) && (!f.assigned || e.assigned_to === f.assigned)
-    && (!f.from || e.received_at >= f.from) && (!f.to || e.received_at.slice(0, 10) <= f.to)), [data.data, property, f])
+    && (!f.from || e.received_at >= f.from) && (!f.to || e.received_at.slice(0, 10) <= f.to)
+    && (f.min === '' || (e.budget ?? -1) >= Number(f.min)) && (f.max === '' || (e.budget != null && e.budget <= Number(f.max))))
+    .sort(SORTS.find(([k]) => k === f.sort)[2]), [data.data, property, f])
 
   if (data.loading) return <TableSkeleton />
   if (data.error) return <ErrorBox error={data.error} onRetry={data.reload} />
@@ -34,12 +49,21 @@ export default function Enquiries() {
   const name = (id) => staff.find((s) => s.id === id)?.full_name ?? ''
   const today = new Date(); today.setHours(23, 59, 59)
   const dueFollowUps = followUps.filter((x) => new Date(x.due_at) <= today)
+  const fresh = rows.filter((e) => !isApproached(e))
+  const approached = rows.filter(isApproached)
 
   const filters = (
     <>
-      <select aria-label="Status" className={`${inputCls} !w-auto`} value={f.status} onChange={(e) => setF({ ...f, status: e.target.value })}>
-        <option value="">All statuses</option>{ENQUIRY_STATUSES.map((s) => <option key={s} value={s}>{label(s)}</option>)}
+      <select aria-label="Sort by" className={`${inputCls} !w-auto`} value={f.sort} onChange={(e) => setF({ ...f, sort: e.target.value })}>
+        {SORTS.map(([k, text]) => <option key={k} value={k}>{text}</option>)}
       </select>
+      <label className="text-xs">Budget from <input type="number" min="0" inputMode="numeric" aria-label="Budget from" className={`${inputCls} !w-24`} value={f.min} onChange={(e) => setF({ ...f, min: e.target.value })} /></label>
+      <label className="text-xs">to <input type="number" min="0" inputMode="numeric" aria-label="Budget to" className={`${inputCls} !w-24`} value={f.max} onChange={(e) => setF({ ...f, max: e.target.value })} /></label>
+      {view !== 'new' && (
+        <select aria-label="Status" className={`${inputCls} !w-auto`} value={f.status} onChange={(e) => setF({ ...f, status: e.target.value })}>
+          <option value="">All statuses</option>{ENQUIRY_STATUSES.map((s) => <option key={s} value={s}>{label(s)}</option>)}
+        </select>
+      )}
       <select aria-label="Source" className={`${inputCls} !w-auto`} value={f.source} onChange={(e) => setF({ ...f, source: e.target.value })}>
         <option value="">All sources</option>{LEAD_SOURCES.map((s) => <option key={s} value={s}>{label(s)}</option>)}
       </select>
@@ -49,6 +73,34 @@ export default function Enquiries() {
       <label className="text-xs">From <input type="date" className={`${inputCls} !w-auto`} value={f.from} onChange={(e) => setF({ ...f, from: e.target.value })} /></label>
       <label className="text-xs">To <input type="date" className={`${inputCls} !w-auto`} value={f.to} onChange={(e) => setF({ ...f, to: e.target.value })} /></label>
     </>
+  )
+
+  // quick actions on a row; they must not open the enquiry
+  const stop = (fn) => (ev) => { ev.stopPropagation(); fn() }
+  const actions = {
+    key: 'actions', label: '', noExport: true, render: (e) => (
+      <span className="flex flex-wrap gap-1">
+        <Small href={`tel:+91${e.phone.slice(-10)}`} onClick={(ev) => ev.stopPropagation()}>Call</Small>
+        {canCoupon && <Small onClick={stop(() => setCoupon({ enquiry: e }))}>Send coupon</Small>}
+      </span>
+    ),
+  }
+  const columns = [
+    { key: 'received_at', label: 'Received', render: (e) => formatDateTime(e.received_at), value: (e) => e.received_at },
+    { key: 'name', label: 'Name', render: (e) => <span className="font-medium">{e.name}{e.duplicate_of && <span className="ml-1 text-xs text-gold-deep">duplicate</span>}</span>, value: (e) => e.name },
+    { key: 'phone', label: 'Mobile' }, { key: 'room_type', label: 'Looking for' },
+    { key: 'budget', label: 'Budget', render: (e) => (e.budget != null ? rupees(e.budget) : '—'), value: (e) => e.budget ?? '' },
+    { key: 'move_in', label: 'Move-in', render: (e) => formatDate(e.move_in), value: (e) => e.move_in },
+    { key: 'source', label: 'Source', value: (e) => label(e.source) },
+    { key: 'temperature', label: 'Lead', render: (e) => <StatusBadge value={e.temperature} />, value: (e) => e.temperature },
+    { key: 'status', label: 'Status', render: (e) => <>{<StatusBadge value={e.status} />}{e.coupon_code && <span className="ml-1 font-mono text-xs">{e.coupon_code}</span>}</>, value: (e) => e.status },
+    ...(view === 'approached' ? [{ key: 'approached_at', label: 'Approached', render: (e) => formatDateTime(e.approached_at), value: (e) => e.approached_at ?? '' }] : []),
+    { key: 'assigned_to', label: 'Assigned', value: (e) => name(e.assigned_to) },
+    { key: 'next_follow_up_at', label: 'Next follow-up', render: (e) => formatDateTime(e.next_follow_up_at), value: (e) => e.next_follow_up_at },
+    actions,
+  ]
+  const table = (list, title, empty) => (
+    <DataTable key={view} title={title} rows={list} filters={filters} empty={empty} onRowClick={(e) => navigate(`/admin/enquiries/${e.id}`)} columns={columns} />
   )
 
   return (
@@ -71,20 +123,27 @@ export default function Enquiries() {
           </ul>
         </section>
       )}
-      <Tabs tab={view} onTab={setView} tabs={[['list', 'List'], ['board', 'Board'], ...(['admin', 'manager'].includes(role) ? [['coupons', 'Coupons']] : [])]} label="View" />
-      {view === 'coupons' ? <Coupons /> : view === 'list' ? (
-        <DataTable title="Enquiries" rows={rows} filters={filters} onRowClick={(e) => navigate(`/admin/enquiries/${e.id}`)} columns={[
-          { key: 'received_at', label: 'Received', render: (e) => formatDate(e.received_at), value: (e) => e.received_at },
-          { key: 'name', label: 'Name', render: (e) => <span className="font-medium">{e.name}{e.duplicate_of && <span className="ml-1 text-xs text-gold-deep">duplicate</span>}</span>, value: (e) => e.name },
-          { key: 'phone', label: 'Mobile' }, { key: 'room_type', label: 'Looking for' },
-          { key: 'move_in', label: 'Move-in', render: (e) => formatDate(e.move_in), value: (e) => e.move_in },
-          { key: 'source', label: 'Source', value: (e) => label(e.source) },
-          { key: 'temperature', label: 'Lead', render: (e) => <StatusBadge value={e.temperature} />, value: (e) => e.temperature },
-          { key: 'status', label: 'Status', render: (e) => <StatusBadge value={e.status} />, value: (e) => e.status },
-          { key: 'assigned_to', label: 'Assigned', value: (e) => name(e.assigned_to) },
-          { key: 'next_follow_up_at', label: 'Next follow-up', render: (e) => formatDateTime(e.next_follow_up_at), value: (e) => e.next_follow_up_at },
-        ]} />
-      ) : <Board rows={rows} onChanged={data.reload} filters={filters} />}
+      <Tabs tab={view} onTab={setView} label="View" tabs={[
+        ['new', `Not approached (${fresh.length})`], ['approached', `Approached (${approached.length})`], ['list', 'All'], ['board', 'Board'],
+        ...(canCoupon ? [['coupons', 'Coupons']] : []),
+      ]} />
+      {view === 'new' && <p className="mb-3 text-sm text-slate-600">New enquiries nobody has called, messaged or sent a coupon yet. They move to Approached on their own.</p>}
+      {view === 'coupons' ? <Coupons />
+        : view === 'new' ? table(fresh, 'Enquiries not approached', 'Every enquiry has been approached')
+          : view === 'approached' ? table(approached, 'Enquiries approached', 'No enquiries approached yet')
+            : view === 'list' ? table(rows, 'Enquiries', 'Nothing here yet')
+              : <Board rows={rows} onChanged={data.reload} filters={filters} />}
+      {coupon?.enquiry && <CouponForm enquiry={coupon.enquiry} onClose={() => setCoupon(null)} onDone={(c) => { setCoupon({ made: c, for: coupon.enquiry }); data.reload() }} />}
+      {coupon?.made && (
+        <Modal title="Coupon made" onClose={() => setCoupon(null)}>
+          <p className="text-sm">Coupon <strong className="font-mono">{coupon.made.code}</strong> ({couponValue(coupon.made)}) is ready for {coupon.for.name}. The enquiry is now under Approached.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button href={couponWhatsapp(coupon.made, { name: coupon.for.name })} target="_blank" rel="noopener"
+              onClick={() => m.logLeadActivity(coupon.for.id, 'whatsapp', 'sent', `Sent coupon ${coupon.made.code}`).catch(() => {})}>Send on WhatsApp</Button>
+            <Button variant="outline" onClick={() => setCoupon(null)}>Done</Button>
+          </div>
+        </Modal>
+      )}
       {adding && <AddEnquiry onClose={() => setAdding(false)} onDone={(id) => navigate(`/admin/enquiries/${id}`)} />}
       {importing && <ImportCsv onClose={() => setImporting(false)} onDone={() => { setImporting(false); data.reload() }} />}
     </div>

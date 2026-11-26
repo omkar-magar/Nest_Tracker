@@ -87,3 +87,11 @@ describe('applying a coupon', () => {
     expect(await one("select is_active from public.offers where code = 'LEAD10'")).toEqual({ is_active: false })
   })
 })
+
+describe('enquiry approached', () => {
+  it('records when an enquiry first leaves new', async () => {
+    const id = (await one("insert into public.enquiries (property_id, name, phone) values ('P1', 'Call me', '9822222222') returning id")).id
+    await as(db, manager, ({ q }) => q("select public.log_lead_activity($1, 'call', 'answered', '', '', null)", [id]))
+    expect(await one('select status, approached_at is not null a from public.enquiries where id = $1', [id])).toEqual({ status: 'contacted', a: true })
+  })
+})
