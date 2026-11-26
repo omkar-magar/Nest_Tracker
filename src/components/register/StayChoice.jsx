@@ -87,7 +87,7 @@ export default function StayChoice({ value: v, onChange }) {
           <h4 className="font-semibold">To pay when you register</h4>
           <dl className="mt-2 space-y-1">
             {q.daily
-              ? <div className="flex justify-between"><dt>{q.nights} night{q.nights === 1 ? '' : 's'}{q.nights >= 30 ? ' (30 nights cost one month)' : ` × ${rupees(q.rate)}`}</dt><dd>{rupees(q.rent)}</dd></div>
+              ? <div className="flex justify-between"><dt>{q.nights} night{q.nights === 1 ? '' : 's'}{q.nights >= 30 ? ' (30 nights cost one month)' : q.rent < q.nights * q.rate ? ' (capped at one month’s rent)' : ` × ${rupees(q.rate)}`}</dt><dd>{rupees(q.rent)}</dd></div>
               : <div className="flex justify-between"><dt>First month's rent</dt><dd>{rupees(q.rent)}</dd></div>}
             <div className="flex justify-between"><dt>Deposit</dt><dd>{rupees(q.deposit)}</dd></div>
             <div className="flex justify-between border-t border-navy/10 pt-1 font-semibold"><dt>Total</dt><dd>{rupees(q.amount)}</dd></div>
