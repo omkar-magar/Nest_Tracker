@@ -8,6 +8,7 @@ import * as r from '../../services/register'
 import { download, exportExcel, exportPDF } from '../../services/exporters'
 import { ymd } from '../../services/pg'
 import { formatDate, rupees } from '../../services/format'
+import ExtendStay from './ExtendStay'
 import { AddGuestModal, ChangesModal, CheckoutModal, History, PastGuests, StatusPill, Tools } from './RegisterPanels'
 import NewRegistrations from './NewRegistrations'
 
@@ -349,6 +350,7 @@ function GuestTable({ rooms, onDetails }) {
 // Room type: a guest alone in the room picks PG or rented; with 2 or more guests the room is PG, no choice.
 const TYPE_OPTS = [['rented', 'Rented (whole room)'], ['pg', 'PG (shared room)']]
 function GuestDetails({ g, room, canEdit, roomNos, onSaved, onCheckout, onClose }) {
+  const [extending, setExtending] = useState(false)
   const date = (v) => (v ? formatDate(v) : '—')
   const alone = r.occupies(g) && room?.people === 1
   const typeText = !room || room.kind === 'empty' ? '—' : room.kind === 'pg' ? `PG · ${people(room.people)}` : 'Rented'
@@ -380,6 +382,7 @@ function GuestDetails({ g, room, canEdit, roomNos, onSaved, onCheckout, onClose 
           <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs text-slate-600">Changes save as you leave each field.</p>
             <div className="flex gap-2">
+              {r.occupies(g) && <Button variant="outline" onClick={() => setExtending(true)}>Extend stay</Button>}
               <Button variant="danger" onClick={() => onCheckout(g)}>{r.occupies(g) ? 'Check out' : 'Remove'}</Button>
               <Button variant="outline" onClick={onClose}>Done</Button>
             </div>
@@ -399,6 +402,7 @@ function GuestDetails({ g, room, canEdit, roomNos, onSaved, onCheckout, onClose 
           <FirstBill g={g} />
         </dl>
       )}
+      {extending && <ExtendStay guest={g} onClose={() => setExtending(false)} onDone={(v) => { setExtending(false); onSaved({ id: g.id, expected_checkout: v.until, rent: (g.rent ?? 0) + (Number(v.charge) || 0), rent_status: v.status }) }} />}
     </Modal>
   )
 }

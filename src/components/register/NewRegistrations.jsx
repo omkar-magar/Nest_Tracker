@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import useAsync from '../../hooks/useAsync'
 import { approveRegistration, firstDue, isDaily, newRegistrations, registrationStayError, stayLabel, stayQuote } from '../../services/registration'
 import { loadRegisterRooms } from '../../services/register'
+import ExtensionRequests from './ExtensionRequests'
 import { ActionMsg, FormFields, Modal, useAction } from '../manage/kit'
 import { Badge, Button, Empty, ErrorBox, Spinner } from '../ui'
 import { TENANT_SECTIONS } from '../manage/tenantFields'
@@ -14,6 +15,7 @@ export default function NewRegistrations({ pid, onApproved }) {
   if (q.loading) return <Spinner />
   if (q.error) return <ErrorBox error={q.error} onRetry={q.reload} />
   return <div className="space-y-3">
+    <ExtensionRequests pid={pid} />
     <Button variant="outline" onClick={q.reload}>Refresh registrations</Button>
     {!q.data?.length && <Empty title="No new registrations" />}
     {(q.data ?? []).map((r) => <div key={r.user_id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-navy/10 p-4">

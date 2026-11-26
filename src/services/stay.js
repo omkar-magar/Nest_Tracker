@@ -16,3 +16,16 @@ export const ADDON_STATUS = { requested: 'Waiting for approval', approved: 'Appr
 
 // '2026-12-01' -> 'December 2026'
 export const monthName = (d) => (d ? new Date(`${d.slice(0, 7)}-01T00:00:00`).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }) : '')
+
+// Extensions: a guest on a daily stay asks; the manager extends any stay (also after check-out) with the dates they
+// decide, an optional charge added to the rent and the rent status.
+export const isDailyStay = (t) => t === 'pg_daily' || t === 'flat_daily'
+export const myExtension = () => rpc('my_extension')
+export const requestExtension = (until, note) => rpc('request_extension', { p_until: until, p_note: note || '' })
+export const cancelExtension = (id) => rpc('cancel_extension', { p_id: id })
+export const extensionRequests = (pid) => rpc('extension_requests', { p_property: pid || null })
+export const extendStay = (guestId, { until, charge, status, note }, requestId = null) => rpc('extend_stay', {
+  p_guest: guestId, p_until: until, p_charge: Number(charge) || 0, p_status: status || null, p_note: note || '', p_request: requestId,
+})
+export const declineExtension = (id, note) => rpc('decline_extension', { p_id: id, p_note: note || '' })
+export const EXTENSION_STATUS = { requested: ['Waiting for your manager', 'amber'], approved: ['Approved', 'green'], declined: ['Not approved', 'red'], cancelled: ['Cancelled', 'gray'] }

@@ -106,7 +106,7 @@ describe('demo registration and resident states', () => {
     fireEvent.change(checkout, { target: { value: '0234-02-21' } })
     expect(screen.getByRole('alert')).toHaveTextContent('Expected check-out must be on or after check-in')
     expect(screen.getByRole('button', { name: 'Approve and add to guest register' })).toBeDisabled()
-    expect(supabase.rpc).not.toHaveBeenCalled()
+    expect(supabase.rpc).not.toHaveBeenCalledWith('approve_resident_registration', expect.anything())
     fireEvent.change(checkout, { target: { value: '2026-11-26' } })
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(screen.getByLabelText('Monthly rent (₹) *')).toHaveValue(6000)

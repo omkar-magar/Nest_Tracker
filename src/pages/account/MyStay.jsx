@@ -3,7 +3,8 @@ import { ActionMsg, Load, useAction } from '../../components/manage/kit'
 import { Badge, Button, Card, Field, Notice, Stat, inputCls } from '../../components/ui'
 import { formatDate, rupees } from '../../services/format'
 import { INVENTORY_ITEMS } from '../../services/inventory'
-import { ADDON_STATUS, addonLabel, cancelAddon, monthName, myStay, requestAddon } from '../../services/stay'
+import { ADDON_STATUS, EXTENSION_STATUS, addonLabel, cancelAddon, cancelExtension, isDailyStay, monthName, myExtension, myStay, requestAddon, requestExtension } from '../../services/stay'
+import useAsync from '../../hooks/useAsync'
 import { useAuth } from '../../context/AuthContext'
 
 const STATUS = { paid: ['Paid', 'green'], pending: ['Due', 'amber'], partially_paid: ['Part paid', 'amber'], not_updated: ['Due', 'amber'], not_applicable: ['Not applicable', 'gray'], upcoming: ['Upcoming', 'gray'] }
@@ -18,13 +19,16 @@ export default function MyStay() {
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <Stat label="Room" value={s.room_no} hint={s.property_name} />
-            <Stat label="Monthly rent" value={rupees(s.rent)} />
+            <Stat label={isDailyStay(s.stay_type) ? 'Stay charge' : 'Monthly rent'} value={rupees(s.rent)} hint={isDailyStay(s.stay_type) ? STATUS[s.rent_status]?.[0] : undefined} />
             <Stat label="Deposit" value={rupees(s.deposit)} hint={STATUS[s.deposit_status]?.[0] === 'Paid' ? 'Paid' : undefined} />
             <Stat label="Checked in" value={formatDate(s.check_in)} hint={s.expected_checkout ? `Until ${formatDate(s.expected_checkout)}` : undefined} />
           </div>
-          <div className="grid gap-3 md:grid-cols-2">
-            {(s.months ?? []).map((m, i) => <MonthCard key={m.month} m={m} title={i === 0 ? 'This month' : 'Next rent'} />)}
-          </div>
+          {isDailyStay(s.stay_type) && <ExtendCard s={s} />}
+          {!isDailyStay(s.stay_type) && (
+            <div className="grid gap-3 md:grid-cols-2">
+              {(s.months ?? []).map((m, i) => <MonthCard key={m.month} m={m} title={i === 0 ? 'This month' : 'Next rent'} />)}
+            </div>
+          )}
           <RoomItems s={s} onChanged={reload} />
         </div>
       ))}
@@ -126,6 +130,44 @@ function RoomItems({ s, onChanged }) {
           </ul>
         </div>
       )}
+    </Card>
+  )
+}
+
+// Daily stays: ask the manager to stay longer. The manager decides the dates and any charge.
+function ExtendCard({ s }) {
+  const ext = useAsync(myExtension, [s.guest_id])
+  const [until, setUntil] = useState('')
+  const [note, setNote] = useState('')
+  const a = useAction()
+  const x = ext.data
+  const waiting = x?.status === 'requested' && x.guest_id === s.guest_id
+  const submit = async (e) => {
+    e.preventDefault()
+    if (await a.run(() => requestExtension(until, note), 'Request sent. Your manager will answer it.')) { setUntil(''); setNote(''); ext.reload() }
+  }
+  const next = s.expected_checkout ? new Date(new Date(`${s.expected_checkout}T00:00:00Z`).getTime() + 864e5).toISOString().slice(0, 10) : undefined
+  return (
+    <Card>
+      <h3 className="font-semibold">Your stay ends on {formatDate(s.expected_checkout)}</h3>
+      <p className="mt-1 text-sm text-slate-600">You are checked out automatically on that day. Want to stay longer? Ask your manager to extend.</p>
+      {x && x.guest_id === s.guest_id && (
+        <p className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+          Your request to stay until {formatDate(x.requested_until)}: <Badge tone={EXTENSION_STATUS[x.status][1]}>{EXTENSION_STATUS[x.status][0]}</Badge>
+          {x.status === 'approved' && x.approved_until && <span>Extended until {formatDate(x.approved_until)}.</span>}
+          {x.answer && x.status !== 'approved' && <span className="text-slate-600">{x.answer}</span>}
+          {waiting && <button className="text-xs font-medium underline focus-visible:outline-2 focus-visible:outline-navy"
+            onClick={async () => (await a.run(() => cancelExtension(x.id), 'Request cancelled')) && ext.reload()}>Cancel</button>}
+        </p>
+      )}
+      {!waiting && (
+        <form onSubmit={submit} className="mt-3 flex flex-wrap items-end gap-3">
+          <Field label="Stay until"><input type="date" className={inputCls} required min={next} value={until} onChange={(e) => setUntil(e.target.value)} /></Field>
+          <Field label="Note (optional)"><input className={inputCls} maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} /></Field>
+          <Button type="submit" disabled={a.busy}>Ask manager to extend</Button>
+        </form>
+      )}
+      <div className="mt-2"><ActionMsg action={a} /></div>
     </Card>
   )
 }

@@ -6,6 +6,7 @@ import * as r from '../../services/register'
 import { parseCSV } from '../../services/exporters'
 import { ymd } from '../../services/pg'
 import { formatDate, rupees } from '../../services/format'
+import ExtendStay from './ExtendStay'
 
 const statusOpts = r.STATUSES.map((s) => [s, r.STATUS_TEXT[s]])
 export const STATUS_TONE = { paid: 'green', pending: 'red', partially_paid: 'amber', not_updated: 'gray', not_applicable: 'gray' }
@@ -75,6 +76,7 @@ export function CheckoutModal({ guest, onClose, onDone }) {
 
 export function PastGuests({ pid, canEdit, onChanged }) {
   const a = useAction()
+  const [extending, setExtending] = useState(null)
   return (
     <Load loader={() => r.loadPastGuests(pid)} deps={[pid]}>
       {(list, reload) => (
@@ -96,8 +98,9 @@ export function PastGuests({ pid, canEdit, onChanged }) {
                 if (!window.confirm(`Move ${g.name} back to current guests?`)) return
                 if (await a.run(() => r.returnGuest(g.id), 'Moved back to current guests')) { reload(); onChanged?.() }
               }}>Undo check-out</Small>
-            ) }] : []),
+            ) }, { key: 'extend', label: '', noExport: true, render: (g) => <Small onClick={() => setExtending(g)}>Extend stay</Small> }] : []),
           ]} />
+          {extending && <ExtendStay guest={extending} onClose={() => setExtending(null)} onDone={() => { setExtending(null); reload(); onChanged?.() }} />}
         </div>
       )}
     </Load>
