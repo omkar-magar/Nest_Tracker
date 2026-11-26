@@ -20,7 +20,8 @@ export async function loadRegisterProperties() {
 export const roomKey = (room) => (room.wing ? `${room.wing}-${room.room_no}` : room.room_no)
 export const loadRegisterRooms = (pid) => rows('rooms', 'room_no, floor, wing', (q) => q.eq('property_id', pid).eq('is_active', true))
   .then((list) => list.map((x) => ({ ...x, room_no: roomKey(x) })))
-export const loadRegister = (pid) => rows('register_guests', LIVE_COLS, (q) => q.eq('property_id', pid).is('checked_out_on', null).order('sort_order').limit(2000))
+export const loadRegister = async (pid) => { await rpc('register_auto_checkout').catch(() => 0); return loadRegisterRows(pid) }
+const loadRegisterRows = (pid) => rows('register_guests', LIVE_COLS, (q) => q.eq('property_id', pid).is('checked_out_on', null).order('sort_order').limit(2000))
 export const loadPastGuests = (pid) => rows('register_guests', `${LIVE_COLS}, checked_out_on, checkout_note`,
   (q) => q.eq('property_id', pid).not('checked_out_on', 'is', null).order('checked_out_on', { ascending: false }).limit(1000))
 export function loadRegisterHistory(pid, day) {

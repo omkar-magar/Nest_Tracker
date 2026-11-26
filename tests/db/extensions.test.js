@@ -80,3 +80,11 @@ describe('automatic check-out', () => {
     expect(await as(db, guest, ({ one: o }) => o('select public.my_extension() x')).then((x) => x.x)).toMatchObject({ status: 'declined', answer: 'Room is booked' })
   })
 })
+
+describe('without a job scheduler', () => {
+  it('lets any signed-in page run the due check-outs', async () => {
+    await db.query('update public.register_guests set expected_checkout = $1 where id = $2', [shift(0), gid])
+    expect(await as(db, guest, ({ one: o }) => o('select public.register_auto_checkout() n')).then((x) => x.n)).toBe(1)
+    expect(await state(guest)).toBe('ended')
+  })
+})

@@ -4,7 +4,9 @@ import { rows, rpc } from './manage'
 export const DEMO_EMAIL = 'customer@yolonest.test'
 export const demoEnabled = import.meta.env.VITE_DEMO_REGISTRATION === 'true'
 export const submitRegistration = (p) => rpc('submit_resident_registration', { p })
-export const myRegistration = () => rpc('my_registration')
+// daily stays past their check-out date leave first (the hosted project has no job scheduler), then the status loads
+export const runDueCheckouts = () => rpc('register_auto_checkout').catch(() => 0)
+export const myRegistration = async () => { await runDueCheckouts(); return rpc('my_registration') }
 export const registrationStayError = (p) => p.check_in && p.expected_checkout && p.expected_checkout < p.check_in
   ? 'Expected check-out must be on or after check-in. Check the day, month and year.' : ''
 
