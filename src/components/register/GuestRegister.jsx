@@ -442,8 +442,12 @@ function EditCell({ g, k, label, type = 'text', options, span, bare, onSaved }) 
 }
 
 // first due date of a registration: extra days instead of the rent, plus anything still owed from registration
-function FirstBill({ g }) {
+// (no extra days when the guest joined on the 1st-10th: the first due date bills the usual rent, plus what is owed)
+export function FirstBill({ g }) {
   if (g.first_bill == null && !(g.carry_forward > 0)) return null
-  const parts = [g.first_bill != null && `${g.first_bill_days} extra days ${money(g.first_bill)}`, g.carry_forward > 0 && `${money(g.carry_forward)} still owed from registration`].filter(Boolean)
-  return <div className="col-span-2 rounded-xl bg-cream p-2 text-sm">First due date{g.due_date ? ` (${formatDate(g.due_date)})` : ''}: {parts.join(' + ')}. Usual rent after that.</div>
+  const first = g.first_bill != null ? g.first_bill : g.rent ?? 0
+  const parts = [g.first_bill != null ? `${g.first_bill_days} extra days ${money(g.first_bill)}` : `rent ${money(first)}`,
+    g.carry_forward > 0 && `${money(g.carry_forward)} still owed from registration`].filter(Boolean)
+  const total = parts.length > 1 ? ` = ${money(first + g.carry_forward)}` : ''
+  return <div className="col-span-2 rounded-xl bg-cream p-2 text-sm">First due date{g.due_date ? ` (${formatDate(g.due_date)})` : ''}: {parts.join(' + ')}{total}. Usual rent after that.</div>
 }
