@@ -30,7 +30,12 @@ export async function newRegistrations(pid) {
   if (!list?.length) return list ?? []
   const pays = await rows('registration_payments', 'customer_id, amount, status, is_simulated, completed_at', (q) =>
     q.in('customer_id', list.map((r) => r.user_id)).eq('status', 'succeeded').order('completed_at', { ascending: false }))
-  return list.map((r) => ({ ...r, registration_payment: (pays ?? []).find((p) => p.customer_id === r.user_id) ?? null }))
+  // only a payment made for this registration (after it was sent), not one left from an earlier registration
+  const sent = (r) => (r.rules_accepted_at ? Date.parse(r.rules_accepted_at) : -Infinity)
+  return list.map((r) => ({
+    ...r,
+    registration_payment: (pays ?? []).find((p) => p.customer_id === r.user_id && Date.parse(p.completed_at) >= sent(r)) ?? null,
+  }))
 }
 
 export async function demoSignIn(code) {

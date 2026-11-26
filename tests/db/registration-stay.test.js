@@ -174,3 +174,59 @@ describe('first due date', () => {
     }
   })
 })
+
+describe('payment shown for the current registration only', () => {
+  it('ignores a payment made before this registration was sent', async () => {
+    const back = await makeUser(db, 'customer', 'Kiran')
+    await db.query(`insert into public.registration_payments (email, phone, property_id, amount, provider, is_simulated, customer_id, claimed_at, status, created_at)
+      values ('k@x.test', '', 'P1', 1000, 'demo', true, $1, now() - interval '1 day', 'succeeded', now() - interval '1 day')`, [back])
+    const free = (await one("select public.registration_rooms('P1', 'pg') -> 0 ->> 'room_no' k")).k
+    await submit(back, { full_name: 'Kiran', room_no: free })
+    const r = await reg(back)
+    expect(r.payment).toBeNull()
+    expect(r).toMatchObject({ amount_paid: 0, to_pay: 14000 })
+  })
+})
+
+describe('owner registrations list on a returning guest', () => {
+  it('shows the room chosen for the waiting registration, not the old stay', async () => {
+    const back = await makeUser(db, 'customer', 'Ravi')
+    await db.query(`insert into public.register_guests (property_id, room_no, name, customer_id, stay_type, rent, check_in, checked_out_on)
+      values ('P1', 'A-999', 'Ravi', $1, 'pg', 7000, '2026-01-01', '2026-02-01')`, [back])
+    const free = (await one("select public.registration_rooms('P1', 'pg') -> 0 ->> 'room_no' k")).k
+    await submit(back, { full_name: 'Ravi', room_no: free })
+    const owner = await makeUser(db, 'admin', 'Owner2')
+    const r = await as(db, owner, ({ one: o }) => o('select public.admin_registrations() r')).then((x) => x.r)
+    expect(r.rows.find((x) => x.id === back)).toMatchObject({ stage: 'waiting', room_no: free, check_in: null })
+  })
+})
+
+describe('paying online once', () => {
+  it('reuses the open payment on a second click and never takes more than is owed', async () => {
+    const payer = await makeUser(db, 'customer', 'Meera')
+    const free = (await one("select public.registration_rooms('P1', 'pg') -> 0 ->> 'room_no' k")).k
+    await submit(payer, { full_name: 'Meera', room_no: free })
+    const start = () => as(db, payer, ({ one: o }) => o('select public.start_my_registration_payment() r')).then((x) => x.r)
+    const done = (id) => as(db, payer, ({ one: o }) => o("select public.demo_complete_my_registration_payment($1, 'success') r", [id])).then((x) => x.r)
+    const a = await start()
+    const b = await start() // second click before the first finished
+    expect(b.id).toBe(a.id)
+    expect((await done(a.id)).status).toBe('succeeded')
+    expect((await done(b.id)).status).toBe('succeeded') // same payment, not added again
+    expect(await reg(payer)).toMatchObject({ amount_paid: 14000, payment_status: 'paid', to_pay: 0 })
+    expect((await one('select count(*)::int n from public.registration_payments where customer_id = $1', [payer])).n).toBe(1)
+    await expect(start()).rejects.toThrow(/Nothing left to pay/)
+  })
+  it('fails an old open order once the registration is paid another way', async () => {
+    const payer = await makeUser(db, 'customer', 'Tara')
+    const free = (await one("select public.registration_rooms('P1', 'pg') -> 0 ->> 'room_no' k")).k
+    await submit(payer, { full_name: 'Tara', room_no: free })
+    await db.query(`insert into public.registration_payments (email, property_id, amount, provider, customer_id, claimed_at)
+      values ('t@x.test', 'P1', 14000, 'demo', $1, now())`, [payer])
+    const old = (await one('select id from public.registration_payments where customer_id = $1', [payer])).id
+    await db.query('update public.tenant_profiles set amount_paid = 14000, payment_status = $2 where user_id = $1', [payer, 'paid'])
+    const r = await as(db, payer, ({ one: o }) => o("select public.demo_complete_my_registration_payment($1, 'success') r", [old])).then((x) => x.r)
+    expect(r.status).toBe('failed')
+    expect(await reg(payer)).toMatchObject({ amount_paid: 14000 })
+  })
+})
