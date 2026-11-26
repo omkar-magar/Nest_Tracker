@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Button, Card, Field, Notice, inputCls } from '../ui'
 import { rupees } from '../../services/format'
 import { payMyRegistration, registrationBalance } from '../../services/registration'
@@ -10,13 +10,15 @@ export default function RegistrationPay({ registration: r, onChanged }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [code, setCode] = useState('')
+  const running = useRef(false) // blocks a second click before the button re-renders as disabled
   if (r.state !== 'pending' || !r.stay_type || r.approval === 'rejected') return null
   if (r.payment_status === 'paid') return <Notice tone="ok">Payment of {rupees(r.amount_paid)} received. Your manager will approve your stay shortly.</Notice>
   if (r.payment_mode === 'offline') return <Notice>Your manager is taking this payment offline.</Notice>
   const due = r.to_pay ?? registrationBalance(r)
   const run = async (fn) => {
-    setBusy(true); setError('')
-    try { return await fn() } catch (e) { setError(e.message) } finally { setBusy(false) }
+    if (running.current) return
+    running.current = true; setBusy(true); setError('')
+    try { return await fn() } catch (e) { setError(e.message) } finally { running.current = false; setBusy(false) }
   }
   const pay = (outcome) => run(async () => {
     const p = await payMyRegistration(outcome)

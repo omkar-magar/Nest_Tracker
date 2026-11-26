@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('../src/context/AuthContext', () => import('./helpers/authMock.js'))
@@ -125,9 +125,11 @@ describe('demo registration and resident states', () => {
     at(<Account />)
     expect(await screen.findByText(/Ask your manager if you want to pay offline, or wait if you have already paid offline/)).toBeInTheDocument()
     db.rpcs.my_registration = { data: { ...waiting, payment_status: 'paid', amount_paid: 14000 } }
-    fireEvent.click(screen.getByRole('button', { name: 'Pay ₹14,000 (demo success)' }))
+    const pay = screen.getByRole('button', { name: 'Pay ₹14,000 (demo success)' })
+    act(() => { pay.click(); pay.click() }) // two clicks before React re-renders the button as disabled
     expect(await screen.findByText(/Payment of ₹14,000 received/)).toBeInTheDocument()
     expect(supabase.rpc).toHaveBeenCalledWith('demo_complete_my_registration_payment', { p_id: 'p1', p_outcome: 'success' })
+    expect(supabase.rpc.mock.calls.filter(([name]) => name === 'start_my_registration_payment')).toHaveLength(1)
   })
   it('makes the manager wait for an online payment, or switch to offline and record what was collected', async () => {
     db.tables.tenant_profiles = { data: [{ user_id: 'c1', property_id: 'P1', stay_type: 'pg', room_no: 'A-101', move_in_date: '2099-01-20', due_day: 4,
