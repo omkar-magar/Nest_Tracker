@@ -140,3 +140,37 @@ describe('payment and approval', () => {
     expect(r.rows.find((x) => x.id === other)).toMatchObject({ stage: 'waiting', payment: 'paid', stay_type: 'flat_daily', room_no: flat })
   })
 })
+
+describe('first due date', () => {
+  const bill = (rent, a, d) => one('select public.first_bill_for($1, $2, $3) b', [rent, a, d]).then((x) => x.b)
+  it('bills only the extra days from the end of the paid month to the next due date', async () => {
+    // joined 20 Dec, due day 5: the month paid covers 20 Dec - 19 Jan; 5 Jan bills 20 Jan - 4 Feb (16 days)
+    expect(await bill(7500, '2026-12-20', '2027-01-05')).toEqual({ days: 16, amount: 4000 })
+    // joined on the 1st-10th: the due date is a month after joining, no extra days
+    expect(await bill(7000, '2026-12-05', '2027-01-05')).toBeNull()
+  })
+  it('stores the first bill on approval of a monthly stay', async () => {
+    // the part-paid guest from above: joined 20 Jan 2099, due 4 Feb -> 20 Feb - 3 Mar = 12 days of 7000
+    const g = await one("select first_bill, first_bill_days, carry_forward from public.register_guests where customer_id is not null and carry_forward = 4000")
+    expect(g).toEqual({ first_bill: 2800, first_bill_days: 12, carry_forward: 4000 })
+  })
+  it('shows the extra days and what is carried on the first due date, then the usual rent', async () => {
+    const u = await makeUser(db, 'customer', 'Kiran')
+    const free = (await as(db, null, ({ one: o }) => o("select public.registration_rooms('P1', 'pg') r")).then((x) => x.r))[0].room_no
+    await submit(u, { room_no: free, move_in_date: day(), due_day: 4 })
+    const today = day()
+    const d = Number(today.slice(8, 10))
+    const [y, m] = today.split('-').map(Number)
+    const due = new Date(Date.UTC(y, m, 4)).toISOString().slice(0, 10) // the 4th of next month
+    await as(db, manager, ({ q }) => q('select public.approve_resident_registration($1, $2)', [u, JSON.stringify({
+      room_no: free, rent: 6000, deposit: 6000, due_date: due, check_in: today, payment_mode: 'offline', payment_status: 'paid' })]))
+    const s = await as(db, u, ({ one: o }) => o('select public.my_stay() s')).then((x) => x.s)
+    const next = s.months[1]
+    if (d > 4) { // check-in after the 4th: next month's due date falls inside the paid month
+      expect(next.extra_days).toBeGreaterThan(0)
+      expect(next.rent).toBe(Math.round(6000 * next.extra_days / 30))
+    } else {
+      expect(next.rent).toBe(6000)
+    }
+  })
+})

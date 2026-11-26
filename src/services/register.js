@@ -8,7 +8,7 @@ import { ymd } from './pg'
 export const STATUSES = ['paid', 'pending', 'partially_paid', 'not_updated', 'not_applicable']
 export const STATUS_TEXT = { paid: 'Paid', pending: 'Pending', partially_paid: 'Partially paid', not_updated: 'Not updated', not_applicable: 'Not applicable' }
 export const FIELDS = ['room_no', 'name', 'contact', 'rent', 'deposit', 'rent_status', 'deposit_status', 'check_in', 'expected_checkout', 'notes']
-const LIVE_COLS = 'id, property_id, room_no, sort_order, name, contact, rent, deposit, rent_status, deposit_status, check_in, expected_checkout, notes, room_type, updated_at, due_date'
+const LIVE_COLS = 'id, property_id, room_no, sort_order, name, contact, rent, deposit, rent_status, deposit_status, check_in, expected_checkout, notes, room_type, updated_at, due_date, customer_id, stay_type, first_bill, first_bill_days, carry_forward'
 
 // ---------------------------------------------------------------- data
 export async function loadRegisterProperties() {

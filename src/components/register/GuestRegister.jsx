@@ -375,6 +375,7 @@ function GuestDetails({ g, room, canEdit, roomNos, onSaved, onCheckout, onClose 
             <EditCell g={g} k="expected_checkout" label="Expected check-out" type="date" onSaved={onSaved} />
             <EditCell g={g} k="due_date" label="Rent due date" type="date" onSaved={onSaved} />
             <EditCell g={g} k="notes" label="Notes" span onSaved={onSaved} />
+            <FirstBill g={g} />
           </div>
           <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs text-slate-600">Changes save as you leave each field.</p>
@@ -395,6 +396,7 @@ function GuestDetails({ g, room, canEdit, roomNos, onSaved, onCheckout, onClose 
           <div><dt className="text-xs text-slate-500">Expected check-out</dt><dd>{date(g.expected_checkout)}</dd></div>
           <div><dt className="text-xs text-slate-500">Rent due date</dt><dd>{date(g.due_date)}</dd></div>
           <div className="col-span-2"><dt className="text-xs text-slate-500">Notes</dt><dd className="break-words">{g.notes || '—'}</dd></div>
+          <FirstBill g={g} />
         </dl>
       )}
     </Modal>
@@ -433,4 +435,11 @@ function EditCell({ g, k, label, type = 'text', options, span, bare, onSaved }) 
       {state && <p role={bad ? 'alert' : 'status'} className={`mt-0.5 text-xs ${bad ? 'text-red-700' : 'text-slate-500'}`}>{state}</p>}
     </div>
   )
+}
+
+// first due date of a registration: extra days instead of the rent, plus anything still owed from registration
+function FirstBill({ g }) {
+  if (g.first_bill == null && !(g.carry_forward > 0)) return null
+  const parts = [g.first_bill != null && `${g.first_bill_days} extra days ${money(g.first_bill)}`, g.carry_forward > 0 && `${money(g.carry_forward)} still owed from registration`].filter(Boolean)
+  return <div className="col-span-2 rounded-xl bg-cream p-2 text-sm">First due date{g.due_date ? ` (${formatDate(g.due_date)})` : ''}: {parts.join(' + ')}. Usual rent after that.</div>
 }

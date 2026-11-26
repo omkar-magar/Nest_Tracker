@@ -151,6 +151,19 @@ describe('demo registration and resident states', () => {
     await waitFor(() => expect(supabase.rpc).toHaveBeenCalledWith('approve_resident_registration', { p_user: 'c1', p: expect.objectContaining({
       payment_mode: 'offline', payment_status: 'partially_paid', amount_paid: '5000', rent: '7000', deposit: '7000' }) }))
   })
+  it('shows only the extra days and what is still owed on the first due date', async () => {
+    asRole('customer')
+    db.rpcs.my_registration = { data: { state: 'active', stays: [] } }
+    db.rpcs.my_stay = { data: { room_no: 'A-101', rent: 7500, deposit: 7500, check_in: '2026-12-20', carry_forward: 1000,
+      months: [
+        { month: '2026-12-01', due_date: null, rent: 7500, extras: [], total: 7500, status: 'paid' },
+        { month: '2027-01-01', due_date: '2027-01-05', rent: 4000, extra_days: 16, carried: 1000, extras: [], total: 5000, status: 'upcoming' },
+      ], inventory: {}, addons: [], addon_prices: {} } }
+    at(<Account />)
+    expect(await screen.findByText('Extra 16 days, up to your due day')).toBeInTheDocument()
+    expect(screen.getByText('Still to pay from registration')).toBeInTheDocument()
+    expect(screen.getByText('₹5,000')).toBeInTheDocument()
+  })
   it('revalidates checkout when check-in changes and allows blank or same-day checkout', () => {
     expect(registrationStayError({ check_in: '2026-11-25', expected_checkout: '' })).toBe('')
     expect(registrationStayError({ check_in: '2026-11-25', expected_checkout: '2026-11-25' })).toBe('')

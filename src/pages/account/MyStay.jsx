@@ -43,9 +43,12 @@ function MonthCard({ m, title }) {
         </div>
         {m.due_date && <Badge tone={tone}>{label}</Badge>}
       </div>
+      {m.extra_days > 0 && <p className="mt-2 text-xs text-slate-600">Your first month was paid when you registered. This bill covers only the days left until your due day; the usual rent starts from the next due date.</p>}
       {m.due_date && (
         <dl className="mt-3 space-y-1 text-sm">
-          <div className="flex justify-between"><dt>Rent</dt><dd>{rupees(m.rent)}</dd></div>
+          {m.extra_days
+            ? <div className="flex justify-between"><dt>Extra {m.extra_days} days, up to your due day</dt><dd>{rupees(m.rent)}</dd></div>
+            : <div className="flex justify-between"><dt>Rent</dt><dd>{rupees(m.rent)}</dd></div>}
           {m.carried > 0 && <div className="flex justify-between"><dt>Still to pay from registration</dt><dd>{rupees(m.carried)}</dd></div>}
           {m.extras.map((x, i) => <div key={i} className="flex justify-between"><dt>{x.qty} × {addonLabel(x.item)} (extra)</dt><dd>{rupees(x.amount)}</dd></div>)}
           <div className="flex justify-between border-t border-navy/10 pt-1 font-semibold"><dt>Total</dt><dd>{rupees(m.total)}</dd></div>
