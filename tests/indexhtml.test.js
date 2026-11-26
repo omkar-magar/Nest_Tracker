@@ -20,6 +20,7 @@ describe('index.html PWA identity', () => {
     ['/admin/login', '/manifest-admin.webmanifest', 'YOLO Admin'],
     ['/admin', '/manifest-admin.webmanifest', 'YOLO Admin'],
     ['/staff/login', '/manifest-staff.webmanifest', 'YOLO Staff'],
+    ['/staff/manager', '/manifest-manager.webmanifest', 'YOLO Manager'],
     ['/', '/manifest.webmanifest', 'YOLO Nest'],
     ['/location', '/manifest.webmanifest', 'YOLO Nest'],
   ])('%s gets %s', (path, manifest, title) => {

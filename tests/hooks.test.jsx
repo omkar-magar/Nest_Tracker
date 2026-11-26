@@ -109,6 +109,7 @@ describe('usePwaIdentity', () => {
     ['/rooms', '/manifest.webmanifest', 'YOLO Nest'],
     ['/staff', '/manifest-staff.webmanifest', 'YOLO Staff'],
     ['/staff/login', '/manifest-staff.webmanifest', 'YOLO Staff'],
+    ['/staff/manager', '/manifest-manager.webmanifest', 'YOLO Manager'],
     ['/admin', '/manifest-admin.webmanifest', 'YOLO Admin'],
   ])('on %s it points the head at %s', (path, manifest, title) => {
     renderHook(() => usePwaIdentity(), { wrapper: wrapper(path) })

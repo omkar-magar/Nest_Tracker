@@ -1,0 +1,18 @@
+{
+  "id": "/staff/manager",
+  "name": "YOLO Nest Manager",
+  "short_name": "YOLO Manager",
+  "description": "The property manager's day at YOLO Nest: beds, dues, arrivals, team and complaints.",
+  "start_url": "/staff/manager",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#fbfaf6",
+  "theme_color": "#1c1f4a",
+  "categories": ["business", "productivity"],
+  "icons": [
+    { "src": "/icons/admin-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/admin-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/admin-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
