@@ -8,6 +8,8 @@ import { Button, Card, ErrorBox, Notice, TableSkeleton, inputCls } from '../../c
 import * as m from '../../services/manage'
 import { ENQUIRY_STATUSES, addDays, label, ymd } from '../../services/pg'
 import { formatDate, formatDateTime, whatsappLink } from '../../services/format'
+import CouponForm from '../../components/manage/CouponForm'
+import { couponWhatsapp } from '../../services/coupons'
 
 export default function EnquiryDetail() {
   const { id } = useParams()
@@ -18,6 +20,7 @@ export default function EnquiryDetail() {
   const [edit, setEdit] = useState(null)
   const [lost, setLost] = useState(false)
   const [call, setCall] = useState({ kind: 'call', outcome: 'answered', notes: '', next: '', followUp: '' })
+  const [coupon, setCoupon] = useState(null) // 'new' while the form is open, then the coupon made
   const [visit, setVisit] = useState({ when: `${addDays(ymd(), 1)}T11:00`, property: '', notes: '' })
   const a = useAction()
   if (d.loading) return <TableSkeleton />
@@ -42,6 +45,12 @@ export default function EnquiryDetail() {
   return (
     <div>
       <Link to="/admin/enquiries" className="text-sm underline">← All enquiries</Link>
+      {coupon === 'new' && <CouponForm enquiry={e} onClose={() => setCoupon(null)} onDone={(c) => { setCoupon(c); reload() }} />}
+      {coupon && coupon !== 'new' && (
+        <div className="mt-3"><Notice tone="ok">Coupon <strong className="font-mono">{coupon.code}</strong> made for {e.name}.{' '}
+          <a className="font-semibold underline" target="_blank" rel="noopener" href={couponWhatsapp(coupon, { name: e.name })}
+            onClick={() => m.logLeadActivity(e.id, 'whatsapp', 'sent', `Sent coupon ${coupon.code}`).catch(() => {})}>Send it on WhatsApp</a></Notice></div>
+      )}
       <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-2xl font-bold">{e.name}</h2>
@@ -55,6 +64,7 @@ export default function EnquiryDetail() {
           <Button href={`tel:+91${e.phone.slice(-10)}`} onClick={() => setCall((c) => ({ ...c, kind: 'call' }))}>Call</Button>
           <Button variant="outline" href={whatsappLink(e.phone, `Hi ${e.name}, this is YOLO Nest about your enquiry.`)} target="_blank" rel="noopener"
             onClick={() => m.logLeadActivity(e.id, 'whatsapp', 'sent', 'Opened WhatsApp chat').then(reload).catch(() => {})}>WhatsApp</Button>
+          {['admin', 'manager'].includes(role) && <Button variant="outline" onClick={() => setCoupon('new')}>Send coupon</Button>}
           {e.status !== 'booked' && <Button variant="sun" onClick={convert}>Convert to tenant</Button>}
           {e.status !== 'booked' && <Button variant="outline" to="/admin/beds">Reserve a bed</Button>}
         </div>

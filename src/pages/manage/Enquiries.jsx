@@ -8,11 +8,14 @@ import * as m from '../../services/manage'
 import { ENQUIRY_STATUSES, LEAD_SOURCES, LOST_REASONS, label } from '../../services/pg'
 import { exportCSV, parseCSV } from '../../services/exporters'
 import { formatDate, formatDateTime } from '../../services/format'
+import { useAuth } from '../../context/AuthContext'
+import Coupons from '../../components/manage/Coupons'
 
 const RAW_COLUMNS = ['received_at', 'name', 'phone', 'email', 'property_id', 'room_type', 'budget', 'move_in', 'source', 'message', 'status', 'lost_reason', 'temperature']
 
 export default function Enquiries() {
   const { property } = useScope()
+  const { role } = useAuth()
   const data = useAsync(() => Promise.all([m.loadEnquiries(), m.loadStaffLogins(), m.loadMyFollowUps()]), [])
   const [view, setView] = useState('list')
   const [f, setF] = useState({ status: '', source: '', assigned: '', from: '', to: '' })
@@ -68,8 +71,8 @@ export default function Enquiries() {
           </ul>
         </section>
       )}
-      <Tabs tab={view} onTab={setView} tabs={[['list', 'List'], ['board', 'Board']]} label="View" />
-      {view === 'list' ? (
+      <Tabs tab={view} onTab={setView} tabs={[['list', 'List'], ['board', 'Board'], ...(['admin', 'manager'].includes(role) ? [['coupons', 'Coupons']] : [])]} label="View" />
+      {view === 'coupons' ? <Coupons /> : view === 'list' ? (
         <DataTable title="Enquiries" rows={rows} filters={filters} onRowClick={(e) => navigate(`/admin/enquiries/${e.id}`)} columns={[
           { key: 'received_at', label: 'Received', render: (e) => formatDate(e.received_at), value: (e) => e.received_at },
           { key: 'name', label: 'Name', render: (e) => <span className="font-medium">{e.name}{e.duplicate_of && <span className="ml-1 text-xs text-gold-deep">duplicate</span>}</span>, value: (e) => e.name },

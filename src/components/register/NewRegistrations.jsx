@@ -32,7 +32,8 @@ function StayLine({ r }) {
   if (!r.stay_type) return null
   const [label, tone] = PAYMENT_STATE[r.payment_status] ?? PAYMENT_STATE.waiting
   return <>
-    <p className="text-sm">{stayLabel(r.stay_type)} · room {r.room_no} · from {formatDate(r.move_in_date)}{isDaily(r.stay_type) ? ` to ${formatDate(r.checkout_date)}` : ` · due day ${r.due_day}`} · {rupees(r.amount_due)}</p>
+    <p className="text-sm">{stayLabel(r.stay_type)} · room {r.room_no} · from {formatDate(r.move_in_date)}{isDaily(r.stay_type) ? ` to ${formatDate(r.checkout_date)}` : ` · due day ${r.due_day}`} · {rupees(r.amount_due)}
+      {r.discount > 0 && ` · coupon ${r.coupon_code} −${rupees(r.discount)}`}{r.amount_paid > 0 && ` · paid ${rupees(r.amount_paid)}`}</p>
     <p className="mt-1"><Badge tone={tone}>{label}</Badge> <span className="text-xs text-slate-600">{r.payment_mode === 'offline' ? 'Offline' : 'Online'}</span></p>
   </>
 }
@@ -47,7 +48,7 @@ function Approval({ registration: r, onClose, onDone }) {
   const daily = isDaily(r.stay_type)
   const [v, setV] = useState({ room_no: r.room_no || '', rent: '', deposit: '', due_date: daily ? (r.move_in_date || '') : (firstDue(r.move_in_date, r.due_day) || ''),
     check_in: r.move_in_date || ymd(), expected_checkout: r.checkout_date || '', room_type: r.stay_type?.startsWith('flat') ? 'rented' : 'pg', notes: '',
-    payment_mode: r.payment_mode || 'online', payment_status: 'paid', amount_paid: String(r.amount_due ?? '') })
+    payment_mode: r.payment_mode || 'online', payment_status: 'paid', amount_paid: String(Math.max((r.amount_due ?? 0) - (r.discount ?? 0), 0)) })
   // rent and deposit start from the prices of the stay the guest chose
   const quote = useAsync(() => (r.stay_type ? stayQuote(r.stay_type, r.move_in_date, r.checkout_date) : Promise.resolve(null)), [r.user_id])
   useEffect(() => {

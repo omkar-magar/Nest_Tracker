@@ -44,7 +44,7 @@ describe('demo registration and resident states', () => {
     at(<Account />)
     expect(await screen.findByText(/Waiting for payment/)).toBeInTheDocument()
     expect(screen.getByText('PG (monthly)')).toBeInTheDocument()
-    expect(screen.getByText('₹14,000')).toBeInTheDocument()
+    expect(screen.getAllByText('₹14,000').length).toBeGreaterThan(0)
   })
   it.each([
     ['pending', /Waiting for manager’s approval/],

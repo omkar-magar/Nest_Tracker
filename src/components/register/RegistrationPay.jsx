@@ -1,33 +1,60 @@
 import { useState } from 'react'
-import { Button, Card, Notice } from '../ui'
+import { Button, Card, Field, Notice, inputCls } from '../ui'
 import { rupees } from '../../services/format'
 import { payMyRegistration, registrationBalance } from '../../services/registration'
+import { applyCoupon, removeCoupon } from '../../services/coupons'
 
 // Payment step of a sent registration. Online is the default; the manager may take it offline instead.
+// A coupon code from the office comes off the price before paying.
 export default function RegistrationPay({ registration: r, onChanged }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [code, setCode] = useState('')
   if (r.state !== 'pending' || !r.stay_type || r.approval === 'rejected') return null
   if (r.payment_status === 'paid') return <Notice tone="ok">Payment of {rupees(r.amount_paid)} received. Your manager will approve your stay shortly.</Notice>
   if (r.payment_mode === 'offline') return <Notice>Your manager is taking this payment offline.</Notice>
-  const due = registrationBalance(r)
-  const pay = async (outcome) => {
+  const due = r.to_pay ?? registrationBalance(r)
+  const run = async (fn) => {
     setBusy(true); setError('')
-    try {
-      const p = await payMyRegistration(outcome)
-      if (p.status === 'succeeded') onChanged()
-      else setError('Payment failed. Nothing was charged. Try again.')
-    } catch (e) { setError(e.message) } finally { setBusy(false) }
+    try { return await fn() } catch (e) { setError(e.message) } finally { setBusy(false) }
+  }
+  const pay = (outcome) => run(async () => {
+    const p = await payMyRegistration(outcome)
+    if (p.status === 'succeeded') onChanged()
+    else setError('Payment failed. Nothing was charged. Try again.')
+  })
+  const apply = (e) => {
+    e.preventDefault()
+    run(async () => { await applyCoupon(code.trim()); setCode(''); onChanged() })
   }
   return (
     <Card>
       <h2 className="text-lg font-bold">Payment · {rupees(due)}</h2>
-      <p className="mt-1 text-sm text-slate-600">This is the price of the stay you chose{r.amount_paid > 0 ? ` (${rupees(r.amount_paid)} already paid)` : ''}.</p>
-      <p className="mt-2 rounded-xl bg-cream p-3 text-sm">Ask your manager if you want to pay offline, or wait if you have already paid offline.</p>
+      <dl className="mt-2 space-y-1 text-sm">
+        <div className="flex justify-between"><dt>Price of the stay you chose</dt><dd>{rupees(r.amount_due)}</dd></div>
+        {r.discount > 0 && (
+          <div className="flex justify-between text-green-800">
+            <dt>Coupon {r.coupon_code}{r.coupon_description ? ` (${r.coupon_description})` : ''}{' '}
+              {!r.amount_paid && <button type="button" className="text-xs font-medium text-navy underline focus-visible:outline-2 focus-visible:outline-navy" disabled={busy}
+                onClick={() => run(async () => { await removeCoupon(); onChanged() })}>Remove</button>}
+            </dt>
+            <dd>−{rupees(r.discount)}</dd>
+          </div>
+        )}
+        {r.amount_paid > 0 && <div className="flex justify-between"><dt>Already paid</dt><dd>−{rupees(r.amount_paid)}</dd></div>}
+        <div className="flex justify-between border-t border-navy/10 pt-1 font-semibold"><dt>To pay</dt><dd>{rupees(due)}</dd></div>
+      </dl>
+      {!r.amount_paid && (
+        <form onSubmit={apply} className="mt-3 flex flex-wrap items-end gap-2">
+          <Field label="Coupon code"><input className={`${inputCls} uppercase`} value={code} onChange={(e) => setCode(e.target.value)} autoComplete="off" /></Field>
+          <Button type="submit" variant="outline" disabled={busy || !code.trim()}>Apply</Button>
+        </form>
+      )}
+      <p className="mt-3 rounded-xl bg-cream p-3 text-sm">Ask your manager if you want to pay offline, or wait if you have already paid offline.</p>
       <div className="mt-3"><Notice tone="warn"><strong>Demo payment.</strong> No real money moves. Pick the outcome you want to test.</Notice></div>
       {error && <p role="alert" className="mt-2 text-sm text-red-700">{error}</p>}
       <div className="mt-3 flex flex-wrap gap-2">
-        <Button variant="sun" disabled={busy} onClick={() => pay('success')}>{busy ? 'Paying…' : `Pay ${rupees(due)} (demo success)`}</Button>
+        <Button variant="sun" disabled={busy} onClick={() => pay('success')}>{busy ? 'Please wait…' : `Pay ${rupees(due)} (demo success)`}</Button>
         <Button variant="outline" disabled={busy} onClick={() => pay('failure')}>Simulate a failed payment</Button>
       </div>
     </Card>
