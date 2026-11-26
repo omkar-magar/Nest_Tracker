@@ -32,7 +32,10 @@ export function Load({ loader, deps = [], children }) {
 // Runs an action, keeps busy / error / message state.
 export function useAction() {
   const [state, setState] = useState({ busy: false, error: '', msg: '' })
+  const running = useRef(false) // a second click before the button re-renders as disabled is ignored
   const run = useCallback(async (fn, okMsg = '') => {
+    if (running.current) return undefined
+    running.current = true
     setState({ busy: true, error: '', msg: '' })
     try {
       const r = await fn()
@@ -41,6 +44,8 @@ export function useAction() {
     } catch (e) {
       setState({ busy: false, error: e.message || String(e), msg: '' })
       return undefined
+    } finally {
+      running.current = false
     }
   }, [])
   return { ...state, run, clear: () => setState({ busy: false, error: '', msg: '' }) }

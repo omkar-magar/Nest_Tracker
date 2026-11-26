@@ -88,3 +88,13 @@ describe('without a job scheduler', () => {
     expect(await state(guest)).toBe('ended')
   })
 })
+
+describe('extending twice by mistake', () => {
+  it('does not add the charge again for the same new date', async () => {
+    const before = await one('select rent, expected_checkout from public.register_guests where id = $1', [mid])
+    const until = shift(40)
+    await as(db, manager, ({ q }) => q("select public.extend_stay($1, $2, 500, 'pending')", [mid, until]))
+    await expect(as(db, manager, ({ q }) => q("select public.extend_stay($1, $2, 500, 'pending')", [mid, until]))).rejects.toThrow(/already ends on/)
+    expect(await one('select rent from public.register_guests where id = $1', [mid])).toEqual({ rent: before.rent + 500 })
+  })
+})
