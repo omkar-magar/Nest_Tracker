@@ -5,11 +5,19 @@ import DataTable from '../../components/manage/DataTable'
 import { ActionMsg, FormFields, H3, Load, Modal, Small, StatusBadge, Tabs, coerce, useAction, useScope } from '../../components/manage/kit'
 import { Badge, Button, Card, Notice } from '../../components/ui'
 import * as m from '../../services/manage'
-import { BED_STATES, bedState, label } from '../../services/pg'
+import { BED_STATES, bedState, boardState, label, placeGuests } from '../../services/pg'
 import { formatDate, rupees } from '../../services/format'
 import { monthRange } from '../../services/dashboard'
-import { loadStayingGuests } from '../../services/register'
+import { guestKey, guestsByRoom, loadStayingGuests } from '../../services/register'
 import { roomRent } from '../../services/reports'
+
+// occupied beds per room, counting guest-register guests on their room's free beds (as on the Beds tab)
+function withTaken([rooms, ...rest]) {
+  const register = rest.pop()
+  const { onBed } = placeGuests(rooms, (r) => register[guestKey(r)])
+  const marked = rooms.map((r) => ({ ...r, taken: r.beds.filter((b) => boardState(b, r, onBed[b.id]) === 'occupied').length }))
+  return [marked, ...rest]
+}
 
 const ROOM_FIELDS = (properties, categories) => [
   { key: 'id', label: 'Room id (used for photo file names)', required: true, help: 'e.g. p1-204. Cannot be changed later.' },
@@ -115,7 +123,8 @@ function RoomsTab() {
   return (
     <Load loader={() => Promise.all([m.loadRoomsWithBeds(property), m.rows('categories', '*', (q) => q.order('sort_order')),
       property ? m.loadFloors(property) : m.rows('floors', '*', (q) => q.order('property_id').order('number')),
-      m.loadElectricityIds(property).then(m.electricityIndex)])} deps={[property]}>
+      m.loadElectricityIds(property).then(m.electricityIndex),
+      loadStayingGuests(property).then(guestsByRoom).catch(() => ({}))]).then(withTaken)} deps={[property]}>
       {([rooms, categories, floors, power], reload) => (
         <div>
           <div className="mb-4 flex flex-wrap gap-2">
@@ -144,7 +153,7 @@ function RoomsTab() {
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     {!r.is_active && <Badge>Inactive</Badge>}
-                    <Badge tone="navy">{r.beds.filter((b) => bedState(b) === 'occupied').length}/{r.beds.length} occupied</Badge>
+                    <Badge tone="navy">{r.taken}/{r.beds.length} occupied</Badge>
                     <Small onClick={() => setOpen(open === r.id ? null : r.id)} aria-expanded={open === r.id}>Beds & history</Small>
                     <Small onClick={() => setEditing({ ...r, features: r.features.join(', '), photos: (r.photos || []).join(', ') })}>Edit</Small>
                   </div>

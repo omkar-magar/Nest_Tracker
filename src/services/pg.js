@@ -17,6 +17,30 @@ export function bedState(b) {
   return 'vacant'
 }
 
+// Bed state on the bed map: a bed in an inactive room (or floor) is inactive too, and a free bed holding a
+// guest-register guest counts as occupied. Most current guests are only in the register, not checked in.
+export function boardState(b, room, guest) {
+  if (room?.is_active === false) return 'inactive'
+  const st = bedState(b)
+  return st === 'vacant' && guest ? 'occupied' : st
+}
+
+// Seats each room's register guests on its free beds in label order. Returns { bed id -> guest } and, per room
+// id, guests left without a bed (more guests than free beds).
+export function placeGuests(rooms, guestsOf) {
+  const onBed = {}
+  const extra = {}
+  for (const r of rooms) {
+    const queue = [...(guestsOf(r) ?? [])]
+    for (const b of [...r.beds].sort((x, y) => x.label.localeCompare(y.label))) {
+      if (!queue.length) break
+      if (boardState(b, r) === 'vacant') onBed[b.id] = queue.shift()
+    }
+    if (queue.length) extra[r.id] = queue
+  }
+  return { onBed, extra }
+}
+
 // Invoice label, same rules as public.bill_state()
 export function invoiceState(b, today = ymd()) {
   if (b.status === 'void') return 'void'

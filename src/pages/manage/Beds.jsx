@@ -7,7 +7,7 @@ import { ActionMsg, Fact, FormFields, H3, Modal, Small, useAction, useScope } fr
 import DataTable from '../../components/manage/DataTable'
 import { Button, ErrorBox, Notice, TableSkeleton } from '../../components/ui'
 import * as m from '../../services/manage'
-import { BED_STATES, addDays, bedState, label, vacancyMessage, ymd } from '../../services/pg'
+import { BED_STATES, addDays, boardState, label, placeGuests, vacancyMessage, ymd } from '../../services/pg'
 import { guestKey, guestsByRoom, loadStayingGuests } from '../../services/register'
 import { inventoryLine, loadInventory } from '../../services/inventory'
 import { brand } from '../../data/site'
@@ -49,16 +49,22 @@ export default function Beds() {
     const inRegister = (r) => register[guestKey(r)] ?? []
     const occupant = Object.fromEntries(occ.map((o) => [o.bed_id, o.bookings]))
     const reservation = Object.fromEntries(resv.map((r) => [r.bed_id, r]))
+    const board = rooms.filter((x) => x.is_active || manage)
+    // register guests take their room's free beds, so the colours and counts show real occupancy
+    const { onBed, extra } = placeGuests(board, inRegister)
+    const stateOf = (b, r) => boardState(b, r, onBed[b.id])
     const floors = {}
-    for (const r of rooms.filter((x) => x.is_active || manage)) {
+    for (const r of board) {
       const key = `${r.property_id} · ${r.wing} wing · Floor ${r.floor}`
       ;(floors[key] ??= []).push(r)
     }
-    const all = rooms.flatMap((r) => r.beds.map((b) => ({ ...b, room: r })))
-    const counts = Object.fromEntries(Object.keys(BED_STATES).map((k) => [k, all.filter((b) => bedState(b) === k).length]))
+    const all = board.flatMap((r) => r.beds.map((b) => ({ ...b, room: r })))
+    const counts = Object.fromEntries(Object.keys(BED_STATES).map((k) => [k, all.filter((b) => stateOf(b, b.room) === k).length]))
     const upcoming = occ.filter((o) => o.bookings.expected_checkout)
       .map((o) => ({ id: o.bed_id, bed: all.find((b) => b.id === o.bed_id)?.code, name: o.bookings.profiles?.full_name, date: o.bookings.expected_checkout,
         notice: o.bookings.notice_date, customer: o.bookings.customer_id }))
+      .concat(all.filter((b) => onBed[b.id]?.expected_checkout).map((b) => ({ id: b.id, bed: b.code, name: onBed[b.id].name,
+        date: onBed[b.id].expected_checkout, notice: null, customer: null })))
       .sort((a, b) => a.date.localeCompare(b.date))
     const regRooms = rooms.filter((r) => inRegister(r).length)
     const reg = {
@@ -67,12 +73,12 @@ export default function Beds() {
       rooms: regRooms.length,
     }
     const stockOf = (r) => inventoryLine(furniture[`${r.property_id}|${r.room_no}`])
-    return { rooms, floors, occupant, reservation, counts, upcoming, inRegister, reg, stockOf }
+    return { rooms, floors, occupant, reservation, counts, upcoming, inRegister, reg, stockOf, onBed, extra, stateOf }
   }, [data.data, manage])
 
   if (data.loading) return <TableSkeleton />
   if (data.error) return <ErrorBox error={data.error} onRetry={data.reload} />
-  const { floors, occupant, reservation, counts, upcoming, rooms, inRegister, reg, stockOf } = view
+  const { floors, occupant, reservation, counts, upcoming, rooms, inRegister, reg, stockOf, onBed, extra, stateOf } = view
 
   const share = () => {
     const msg = vacancyMessage(rooms, { brandName: brand.name, phone: brand.phone, url: `${window.location.origin}/vacancies`, taken: (r) => inRegister(r).length })
@@ -97,7 +103,7 @@ export default function Beds() {
           <Link to="/admin/register" className="font-semibold underline focus-visible:outline-2 focus-visible:outline-navy">Guest register</Link>:{' '}
           {reg.total} guest{reg.total === 1 ? '' : 's'} staying in {reg.rooms} room{reg.rooms === 1 ? '' : 's'}
           {reg.shown < reg.total && ` (${reg.total - reg.shown} in rooms not on this board)`}.
-          {' '}Bed colours follow check-ins made in the app; register guests are listed on each room card and left out of Share vacancies.
+          {' '}Register guests fill their room's free beds in order (A, B, ...), so they count as occupied here and are left out of Share vacancies.
         </p>
       )}
       {Object.keys(floors).length === 0 && <Notice>No rooms yet. Add them under Properties & rooms.</Notice>}
@@ -115,16 +121,22 @@ export default function Beds() {
                       {inRegister(r).map((g) => g.name).join(', ')}
                     </p>
                   )}
+                  {extra[r.id] && (
+                    <p className="mt-1 text-xs font-semibold text-red-700">
+                      {extra[r.id].length} register guest{extra[r.id].length === 1 ? '' : 's'} without a free bed: {extra[r.id].map((g) => g.name).join(', ')}
+                    </p>
+                  )}
                   {stockOf(r) && <p className="mt-1 text-xs text-slate-600">Furniture: {stockOf(r)}</p>}
                   <div className="mt-2 flex flex-wrap gap-2">
-                    {r.beds.sort((a, b) => a.label.localeCompare(b.label)).filter((b) => !filter || bedState(b) === filter).map((b) => {
-                      const st = bedState(b)
+                    {r.beds.sort((a, b) => a.label.localeCompare(b.label)).filter((b) => !filter || stateOf(b, r) === filter).map((b) => {
+                      const st = stateOf(b, r)
+                      const who = occupant[b.id]?.profiles?.full_name ?? onBed[b.id]?.name
                       return (
-                        <button key={b.id} onClick={() => setBed({ ...b, room: r })}
-                          aria-label={`Bed ${b.code}: ${BED_STATES[st].label}${occupant[b.id] ? `, ${occupant[b.id].profiles?.full_name}` : ''}`}
+                        <button key={b.id} onClick={() => setBed({ ...b, room: r, state: st, guest: onBed[b.id] })}
+                          aria-label={`Bed ${b.code}: ${BED_STATES[st].label}${who ? `, ${who}` : ''}`}
                           className={`min-w-[4.5rem] rounded-xl border px-2 py-1.5 text-left text-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy ${BED_STATES[st].cls}`}>
                           <span className="block font-bold">Bed {b.label}</span>
-                          <span className="block truncate">{occupant[b.id]?.profiles?.full_name ?? (reservation[b.id] ? reservation[b.id].tenant_name : BED_STATES[st].label)}</span>
+                          <span className="block truncate">{who ?? (reservation[b.id] ? reservation[b.id].tenant_name : BED_STATES[st].label)}</span>
                         </button>
                       )
                     })}
@@ -141,7 +153,7 @@ export default function Beds() {
           <H3>Upcoming vacancies</H3>
           <DataTable title="Upcoming vacancies" rows={upcoming} search={false} empty="No planned check-outs" columns={[
             { key: 'date', label: 'Free from', render: (r) => formatDate(r.date) }, { key: 'bed', label: 'Bed' },
-            { key: 'name', label: 'Current tenant', render: (r) => <Link className="underline" to={`/admin/tenants/${r.customer}`}>{r.name}</Link>, value: (r) => r.name },
+            { key: 'name', label: 'Current tenant', render: (r) => <Link className="underline" to={r.customer ? `/admin/tenants/${r.customer}` : '/admin/register'}>{r.name}</Link>, value: (r) => r.name },
             { key: 'notice', label: 'Notice given', render: (r) => formatDate(r.notice) },
           ]} />
         </>
@@ -164,7 +176,7 @@ export default function Beds() {
 }
 
 function BedPanel({ bed, occupant, reservation, manage, onClose, onChanged }) {
-  const st = bedState(bed)
+  const st = bed.state
   const navigate = useNavigate()
   const a = useAction()
   const [mode, setMode] = useState('')
@@ -193,6 +205,14 @@ function BedPanel({ bed, occupant, reservation, manage, onClose, onChanged }) {
             <Small to={`/admin/tenants/${occupant.customer_id}`}>Open tenant</Small>
             {occupant.profiles?.phone && <Small href={whatsappLink(occupant.profiles.phone)} target="_blank" rel="noopener">WhatsApp</Small>}
           </div>
+        </div>
+      )}
+      {!occupant && bed.guest && (
+        <div className="mt-4 rounded-xl bg-cream p-3 text-sm">
+          <p className="font-semibold">{bed.guest.name}</p>
+          <p>From the guest register{bed.guest.rent ? ` · ${rupees(bed.guest.rent)}` : ''}{bed.guest.rent_status ? ` · rent ${label(bed.guest.rent_status)}` : ''}
+            {bed.guest.expected_checkout ? ` · leaving ${formatDate(bed.guest.expected_checkout)}` : ''}</p>
+          <div className="mt-2"><Small to="/admin/register">Open guest register</Small></div>
         </div>
       )}
       {reservation && (
