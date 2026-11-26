@@ -61,7 +61,10 @@ export default function EnquiryDetail() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button href={`tel:+91${e.phone.slice(-10)}`} onClick={() => setCall((c) => ({ ...c, kind: 'call' }))}>Call</Button>
+          <Button href={`tel:+91${e.phone.slice(-10)}`} onClick={() => {
+            setCall((c) => ({ ...c, kind: 'call' }))
+            m.logLeadActivity(e.id, 'call', '', 'Dialled from the enquiry page').then(reload).catch(() => {})
+          }}>Call</Button>
           <Button variant="outline" href={whatsappLink(e.phone, `Hi ${e.name}, this is YOLO Nest about your enquiry.`)} target="_blank" rel="noopener"
             onClick={() => m.logLeadActivity(e.id, 'whatsapp', 'sent', 'Opened WhatsApp chat').then(reload).catch(() => {})}>WhatsApp</Button>
           {['admin', 'manager'].includes(role) && <Button variant="outline" onClick={() => setCoupon('new')}>Send coupon</Button>}

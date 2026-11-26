@@ -69,3 +69,15 @@ describe('enquiries', () => {
     expect(screen.queryByRole('button', { name: 'Send coupon' })).not.toBeInTheDocument()
   })
 })
+
+describe('calling from the list', () => {
+  it('logs the call so the enquiry moves to Approached', async () => {
+    page()
+    const row = (await screen.findByText('Ravi')).closest('tr')
+    const call = within(row).getByRole('link', { name: 'Call' })
+    expect(call).toHaveAttribute('href', 'tel:+919800000012')
+    call.addEventListener('click', (ev) => ev.preventDefault()) // do not follow tel: in the test
+    fireEvent.click(call)
+    await waitFor(() => expect(supabase.rpc).toHaveBeenCalledWith('log_lead_activity', expect.objectContaining({ p_enquiry: '12', p_kind: 'call' })))
+  })
+})

@@ -80,7 +80,11 @@ export default function Enquiries() {
   const actions = {
     key: 'actions', label: '', noExport: true, render: (e) => (
       <span className="flex flex-wrap gap-1">
-        <Small href={`tel:+91${e.phone.slice(-10)}`} onClick={(ev) => ev.stopPropagation()}>Call</Small>
+        {/* dialling counts as approaching the enquiry, like opening WhatsApp */}
+        <Small href={`tel:+91${e.phone.slice(-10)}`} onClick={(ev) => {
+          ev.stopPropagation()
+          m.logLeadActivity(e.id, 'call', '', 'Dialled from the enquiry list').then(data.reload).catch(() => {})
+        }}>Call</Small>
         {canCoupon && <Small onClick={stop(() => setCoupon({ enquiry: e }))}>Send coupon</Small>}
       </span>
     ),
