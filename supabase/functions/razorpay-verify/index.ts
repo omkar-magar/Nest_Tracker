@@ -20,12 +20,13 @@ Deno.serve(async (req) => {
   const { data: userData } = await caller.auth.getUser()
   if (!userData.user) return json({ error: 'Not signed in' }, 401)
 
-  const { paymentId, razorpay_order_id, razorpay_payment_id, razorpay_signature } = await req.json().catch(() => ({}))
+  const { paymentId, kind, razorpay_order_id, razorpay_payment_id, razorpay_signature } = await req.json().catch(() => ({}))
   if (!paymentId || !razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
     return json({ error: 'Missing payment details' }, 400)
   }
+  const registration = kind === 'registration' // registration payment (registration_payments) instead of a bill
 
-  const { data: pay } = await admin.from('payments')
+  const { data: pay } = await admin.from(registration ? 'registration_payments' : 'payments')
     .select('id, provider, provider_order_id').eq('id', paymentId).eq('customer_id', userData.user.id).maybeSingle()
   if (!pay || pay.provider !== 'razorpay' || pay.provider_order_id !== razorpay_order_id) {
     return json({ error: 'Payment not found' }, 404)
@@ -34,9 +35,11 @@ Deno.serve(async (req) => {
   const expected = await hmacHex(keySecret, `${razorpay_order_id}|${razorpay_payment_id}`)
   if (!safeEqual(expected, String(razorpay_signature))) return json({ error: 'Bad signature' }, 400)
 
-  const { data, error } = await admin.rpc('apply_payment_result', {
-    p_payment_id: pay.id, p_status: 'succeeded', p_provider_payment_id: razorpay_payment_id,
-  })
+  const { data, error } = registration
+    ? await admin.rpc('apply_registration_payment', { p_id: pay.id, p_provider_payment_id: razorpay_payment_id })
+    : await admin.rpc('apply_payment_result', {
+      p_payment_id: pay.id, p_status: 'succeeded', p_provider_payment_id: razorpay_payment_id,
+    })
   if (error) return json({ error: error.message }, 500)
   return json({ status: data })
 })

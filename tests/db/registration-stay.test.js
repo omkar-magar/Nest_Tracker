@@ -1,7 +1,7 @@
 // @vitest-environment node
 // Registration v2: the guest picks stay type, a free room, dates and due day; prices come from Settings (PGlite).
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { as, freshDb, makeUser } from './pg'
+import { as, asService, freshDb, makeUser } from './pg'
 
 let db, guest, other, manager, room, flat
 const day = (offset = 0) => {
@@ -244,5 +244,41 @@ describe('paying online once', () => {
     const r = await as(db, payer, ({ one: o }) => o("select public.demo_complete_my_registration_payment($1, 'success') r", [old])).then((x) => x.r)
     expect(r.status).toBe('failed')
     expect(await reg(payer)).toMatchObject({ amount_paid: 14000 })
+  })
+})
+
+describe('paying the registration through Razorpay', () => {
+  const start = (user) => asService(db, ({ one: o }) => o('select public.razorpay_start_registration_payment($1) r', [user])).then((x) => x.r)
+  const apply = (id, pid) => asService(db, ({ one: o }) => o('select public.apply_registration_payment($1, $2) s', [id, pid])).then((x) => x.s)
+
+  it('is for the server only', async () => {
+    await expect(as(db, guest, ({ q }) => q('select public.razorpay_start_registration_payment($1)', [guest]))).rejects.toThrow(/permission/)
+    await expect(as(db, guest, ({ q }) => q("select public.apply_registration_payment(gen_random_uuid(), 'x')"))).rejects.toThrow(/permission/)
+  })
+  it('works without demo payments, reuses the open order and credits once', async () => {
+    const payer = await makeUser(db, 'customer', 'Ravi')
+    const free = (await one("select public.registration_rooms('P1', 'pg') -> 0 ->> 'room_no' k")).k
+    await submit(payer, { full_name: 'Ravi', room_no: free })
+    await db.query("update public.app_settings set value = 'false' where key = 'demo_payments_enabled'")
+    const a = await start(payer)
+    expect(a).toMatchObject({ amount: 14000, order_id: null })
+    await db.query("update public.registration_payments set provider_order_id = 'order_1' where id = $1", [a.id])
+    expect(await start(payer)).toMatchObject({ id: a.id, order_id: 'order_1' })
+    expect(await apply(a.id, 'pay_1')).toBe('succeeded')
+    expect(await apply(a.id, 'pay_1')).toBe('succeeded') // verify and webhook both arrive
+    expect(await reg(payer)).toMatchObject({ amount_paid: 14000, payment_status: 'paid', to_pay: 0 })
+    await expect(start(payer)).rejects.toThrow(/Nothing left to pay/)
+    await db.query("update public.app_settings set value = 'true' where key = 'demo_payments_enabled'")
+  })
+  it('never credits more than is owed and asks the managers to refund the rest', async () => {
+    const payer = await makeUser(db, 'customer', 'Kiran')
+    const free = (await one("select public.registration_rooms('P1', 'pg') -> 0 ->> 'room_no' k")).k
+    await submit(payer, { full_name: 'Kiran', room_no: free })
+    const a = await start(payer)
+    await db.query('update public.tenant_profiles set amount_paid = 10000 where user_id = $1', [payer])
+    expect(await apply(a.id, 'pay_2')).toBe('succeeded')
+    expect(await reg(payer)).toMatchObject({ amount_paid: 14000, payment_status: 'paid' })
+    const n = await one("select body from public.notifications where subject = 'Refund needed' and user_id = $1", [manager])
+    expect(n.body).toMatch(/₹10000 more than was owed/)
   })
 })

@@ -22,8 +22,15 @@ Deno.serve(async (req) => {
   if (!rp?.order_id || !rp?.id) return json({ ok: true, ignored: 'no payment entity' })
 
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
-  const { data: pay } = await admin.from('payments')
+  // a bill payment, or else a registration payment
+  let registration = false
+  let { data: pay } = await admin.from('payments')
     .select('id, amount, provider').eq('provider_order_id', rp.order_id).maybeSingle()
+  if (!pay) {
+    ;({ data: pay } = await admin.from('registration_payments')
+      .select('id, amount, provider').eq('provider_order_id', rp.order_id).maybeSingle())
+    registration = !!pay
+  }
   if (!pay || pay.provider !== 'razorpay') return json({ ok: true, ignored: 'unknown order' }) // 200 so Razorpay stops retrying
 
   if (rp.amount !== pay.amount * 100 || rp.currency !== 'INR') {
@@ -31,9 +38,11 @@ Deno.serve(async (req) => {
     return json({ error: 'Amount mismatch' }, 400)
   }
 
-  const { error } = await admin.rpc('apply_payment_result', {
-    p_payment_id: pay.id, p_status: 'succeeded', p_provider_payment_id: rp.id,
-  })
+  const { error } = registration
+    ? await admin.rpc('apply_registration_payment', { p_id: pay.id, p_provider_payment_id: rp.id })
+    : await admin.rpc('apply_payment_result', {
+      p_payment_id: pay.id, p_status: 'succeeded', p_provider_payment_id: rp.id,
+    })
   if (error) return json({ error: error.message }, 500) // non-2xx -> Razorpay retries
   return json({ ok: true })
 })

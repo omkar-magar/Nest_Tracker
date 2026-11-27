@@ -19,6 +19,19 @@ async function getPaymentStatus(paymentId) {
   return data
 }
 
+// The registration payment through the real gateway. Like payBill, the result is read back from the database.
+export async function payRegistration(ui) {
+  const order = await paymentProvider.createRegistrationOrder()
+  await paymentProvider.collect(order, ui)
+  const { data, error } = await supabase
+    .from('registration_payments')
+    .select('id, status, amount, is_simulated')
+    .eq('id', order.paymentId)
+    .single()
+  if (error) throw error
+  return data
+}
+
 // amount: a part payment (less than what is owed); leave it out to pay in full
 export async function payBill(bill, ui, amount) {
   const order = await paymentProvider.createOrder(bill, amount)

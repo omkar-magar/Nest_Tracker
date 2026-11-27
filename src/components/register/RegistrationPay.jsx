@@ -3,6 +3,7 @@ import { Button, Card, Field, Notice, inputCls } from '../ui'
 import { rupees } from '../../services/format'
 import { payMyRegistration, registrationBalance } from '../../services/registration'
 import { applyCoupon, removeCoupon } from '../../services/coupons'
+import { paymentProvider } from '../../services/payments'
 
 // Payment step of a sent registration. Online is the default; the manager may take it offline instead.
 // A coupon code from the office comes off the price before paying.
@@ -15,6 +16,7 @@ export default function RegistrationPay({ registration: r, onChanged }) {
   if (r.payment_status === 'paid') return <Notice tone="ok">Payment of {rupees(r.amount_paid)} received. Your manager will approve your stay shortly.</Notice>
   if (r.payment_mode === 'offline') return <Notice>Your manager is taking this payment offline.</Notice>
   const due = r.to_pay ?? registrationBalance(r)
+  const simulated = paymentProvider.isSimulated
   const run = async (fn) => {
     if (running.current) return
     running.current = true; setBusy(true); setError('')
@@ -23,6 +25,7 @@ export default function RegistrationPay({ registration: r, onChanged }) {
   const pay = (outcome) => run(async () => {
     const p = await payMyRegistration(outcome)
     if (p.status === 'succeeded') onChanged()
+    else if (p.status === 'created') setError('Payment not completed. If money was taken it will show here in a few minutes.')
     else setError('Payment failed. Nothing was charged. Try again.')
   })
   const apply = (e) => {
@@ -53,11 +56,17 @@ export default function RegistrationPay({ registration: r, onChanged }) {
         </form>
       )}
       <p className="mt-3 rounded-xl bg-cream p-3 text-sm">Ask your manager if you want to pay offline, or wait if you have already paid offline.</p>
-      <div className="mt-3"><Notice tone="warn"><strong>Demo payment.</strong> No real money moves. Pick the outcome you want to test.</Notice></div>
+      {simulated && <div className="mt-3"><Notice tone="warn"><strong>Demo payment.</strong> No real money moves. Pick the outcome you want to test.</Notice></div>}
       {error && <p role="alert" className="mt-2 text-sm text-red-700">{error}</p>}
       <div className="mt-3 flex flex-wrap gap-2">
-        <Button variant="sun" disabled={busy} onClick={() => pay('success')}>{busy ? 'Please wait…' : `Pay ${rupees(due)} (demo success)`}</Button>
-        <Button variant="outline" disabled={busy} onClick={() => pay('failure')}>Simulate a failed payment</Button>
+        {simulated ? (
+          <>
+            <Button variant="sun" disabled={busy} onClick={() => pay('success')}>{busy ? 'Please wait…' : `Pay ${rupees(due)} (demo success)`}</Button>
+            <Button variant="outline" disabled={busy} onClick={() => pay('failure')}>Simulate a failed payment</Button>
+          </>
+        ) : (
+          <Button variant="sun" disabled={busy} onClick={() => pay()}>{busy ? 'Please wait…' : `Pay ${rupees(due)} online`}</Button>
+        )}
       </div>
     </Card>
   )

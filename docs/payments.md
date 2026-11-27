@@ -18,6 +18,9 @@ Flow: `razorpay-create-order` -> Checkout -> `razorpay-verify` -> `getPaymentSta
 | `razorpay-verify` | customer JWT | Recomputes the checkout signature (`HMAC_SHA256(order_id\|payment_id, key_secret)`), then `apply_payment_result`. |
 | `razorpay-webhook` | none (`verify_jwt = false`), HMAC of the raw body | On `payment.captured` / `order.paid`: checks the amount, then `apply_payment_result`. `payment.failed` is ignored on purpose: Checkout allows retries on the same order, and a payment marked failed is final. Abandoned payments stay `created`. |
 
+### Registration payment
+The new-resident registration payment (stay price + deposit) has its own path: `razorpay-registration-order` (customer JWT) calls `razorpay_start_registration_payment` (service role; reuses an open order for the same amount) and creates the Razorpay order on the `registration_payments` row. `razorpay-verify` with `kind: 'registration'`, or the webhook (it looks in `registration_payments` when the order is not a bill's), settles it through `apply_registration_payment`. That function is idempotent, credits at most what is still owed, and tells the wing's managers to refund anything over that. With `VITE_PAYMENT_PROVIDER=demo` the old demo buttons are used instead.
+
 ### Go live
 1. Razorpay dashboard: get the Key Id and Key Secret (start with Test mode keys, `rzp_test_...`).
 2. Set secrets (never in `.env.local` or any `VITE_` variable):

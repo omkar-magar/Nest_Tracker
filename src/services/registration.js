@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase'
 import { rows, rpc } from './manage'
+import { paymentProvider, payRegistration } from './payments'
 
 export const DEMO_EMAIL = 'customer@yolonest.test'
 export const demoEnabled = import.meta.env.VITE_DEMO_REGISTRATION === 'true'
@@ -89,8 +90,10 @@ export async function verifyEmailCode(email, token) {
   return data
 }
 
-// Paying the registration online from the account page (demo provider: the payer picks the outcome).
+// Paying the registration online from the account page. Demo provider: the payer picks the outcome.
+// Razorpay: Checkout opens; the result is the payment row ('created' if they closed it without paying).
 export async function payMyRegistration(outcome) {
+  if (!paymentProvider.isSimulated) return payRegistration()
   const order = await rpc('start_my_registration_payment')
   return rpc('demo_complete_my_registration_payment', { p_id: order.id, p_outcome: outcome })
 }

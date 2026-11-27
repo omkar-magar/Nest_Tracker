@@ -40,6 +40,12 @@ export const razorpayProvider = {
     return { ...o, description: bill.description }
   },
 
+  // The registration payment (stay price + deposit); the server works out the amount
+  async createRegistrationOrder() {
+    const o = await invoke('razorpay-registration-order', {})
+    return { ...o, kind: 'registration', description: 'Registration payment' }
+  },
+
   // Resolves when Checkout closes (paid or dismissed). It never rejects for "customer gave up";
   // the payment row simply stays 'created' and the UI reports that.
   async collect(order) {
@@ -57,7 +63,7 @@ export const razorpayProvider = {
         theme: navy ? { color: navy } : undefined,
         handler: async (resp) => {
           try {
-            await invoke('razorpay-verify', { paymentId: order.paymentId, ...resp })
+            await invoke('razorpay-verify', { paymentId: order.paymentId, kind: order.kind, ...resp })
           } catch {
             // The webhook will still settle it; the row we read back decides what the customer sees.
           }

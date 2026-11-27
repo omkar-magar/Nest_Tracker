@@ -161,3 +161,33 @@ describe('razorpayProvider', () => {
     await expect(p2).resolves.toBeUndefined()
   })
 })
+
+describe('registration payment through Razorpay', () => {
+  it('createRegistrationOrder asks the server for the order and tags it for verify', async () => {
+    db.fnResult = { data: { paymentId: 'r1', orderId: 'order_r', keyId: 'rzp_test', amount: 14000 }, error: null }
+    const order = await razorpayProvider.createRegistrationOrder()
+    expect(supabase.functions.invoke).toHaveBeenCalledWith('razorpay-registration-order', { body: {} })
+    expect(order).toMatchObject({ paymentId: 'r1', kind: 'registration' })
+  })
+  it('verify is told it is a registration payment', async () => {
+    db.fnResult = { data: { ok: true }, error: null }
+    window.Razorpay = function Razorpay(o) { this.open = () => o.handler({ razorpay_payment_id: 'pay_x', razorpay_order_id: 'order_r', razorpay_signature: 's' }) }
+    await razorpayProvider.collect({ paymentId: 'r1', orderId: 'order_r', amount: 14000, kind: 'registration' })
+    expect(supabase.functions.invoke).toHaveBeenCalledWith('razorpay-verify', {
+      body: { paymentId: 'r1', kind: 'registration', razorpay_payment_id: 'pay_x', razorpay_order_id: 'order_r', razorpay_signature: 's' },
+    })
+  })
+  it('payMyRegistration uses Razorpay when it is the provider and reads the row back', async () => {
+    vi.stubEnv('VITE_PAYMENT_PROVIDER', 'razorpay')
+    vi.resetModules()
+    const { payMyRegistration } = await import('../src/services/registration.js')
+    db.fnResult = { data: { paymentId: 'r1', orderId: 'order_r', keyId: 'rzp_test', amount: 14000 }, error: null }
+    window.Razorpay = function Razorpay(o) { this.open = () => o.modal.ondismiss() }
+    db.tables.registration_payments = { data: { id: 'r1', status: 'created', amount: 14000 }, error: null }
+    const p = await payMyRegistration()
+    expect(p.status).toBe('created')
+    expect(supabase.rpc).not.toHaveBeenCalled() // no demo RPCs
+    expect(queryFor('registration_payments')[0].ops).toContainEqual(['eq', ['id', 'r1']])
+    vi.unstubAllEnvs()
+  })
+})
