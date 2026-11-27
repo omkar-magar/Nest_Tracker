@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import RoomCard from '../components/RoomCard'
+import PhotoGallery from '../components/PhotoGallery'
 import { CardGridSkeleton, Empty, ErrorBox, Notice, PageHeader, inputCls } from '../components/ui'
 import useCatalog from '../hooks/useCatalog'
 import { availability, monthlyEquivalent, wingName, wingsOf } from '../services/catalog'
@@ -118,6 +119,11 @@ export default function Rooms() {
             ) : (
               <div className="mt-3"><Empty title="No rooms match these filters">Try clearing a filter.</Empty></div>
             )}
+
+            <section id="photos" className="mt-12 scroll-mt-16" aria-labelledby="photos-title">
+              <h2 id="photos-title" className="mb-4 text-2xl font-bold">Photos</h2>
+              <PhotoGallery />
+            </section>
           </>
         )}
       </div>

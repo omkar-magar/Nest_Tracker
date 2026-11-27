@@ -51,7 +51,20 @@ export const categories = [
   { id: 'airbnb', name: 'Airbnb-style Stay', tag: 'From ₹2,500 / night' },
 ]
 
-// Room photo: public/images/rooms/<id>.webp   360 photo: public/images/360/<id>.jpg
+// Real photos of the PG, shown as a gallery on the home and Rooms pages. Files go in public/images/gallery/.
+export const gallery = [
+  { src: '/images/gallery/twin-room.webp', caption: 'Twin-sharing room', alt: 'Twin-sharing room with two beds, a study desk and blackout curtains' },
+  { src: '/images/gallery/single-room.webp', caption: 'Single room', alt: 'Single room with a bed, study desk, chair and bean bag' },
+  { src: '/images/gallery/room-wardrobe.webp', caption: 'Room with wardrobe', alt: 'Room with two beds and a tall wooden wardrobe' },
+  { src: '/images/gallery/bathroom.webp', caption: 'Bathroom', alt: 'Tiled bathroom with a geyser, western toilet and wash basin' },
+  { src: '/images/gallery/balcony-lounge.webp', caption: 'Balcony lounge', alt: 'Balcony with green turf and bean bags, city lights in the evening' },
+  { src: '/images/gallery/balcony-day.webp', caption: 'Balcony view', alt: 'Turf-covered balcony with a view over Hinjewadi by day' },
+  { src: '/images/gallery/kitchen.webp', caption: 'Kitchen counter', alt: 'Kitchen with a granite counter, sink and RO water purifier' },
+  { src: '/images/gallery/entrance.webp', caption: 'Room entrance', alt: 'Corridor with room doors, doormats and a potted plant' },
+]
+
+// Room photo: public/images/rooms/<id>.webp (real photos; a room that is not in this list can point
+// image_url at any of them in the Properties screen)   360 photo: public/images/360/<id>.jpg
 // With Supabase connected, rooms come from the database (supabase/seed.sql is the seed copy of this list).
 // This list is only the fallback when Supabase is not configured.
 // wing: 'A' or 'B' (the building the room is in; demo split, set the real one).

@@ -7,6 +7,7 @@ vi.mock('../src/lib/supabase', () => import('./helpers/supabaseMock.js'))
 import { db, resetMock, setConfigured } from './helpers/supabaseMock.js'
 import { renderAt } from './helpers/render.jsx'
 import Img from '../src/components/Img'
+import PhotoGallery from '../src/components/PhotoGallery'
 import RoomCard from '../src/components/RoomCard'
 import Faq from '../src/components/Faq'
 import Footer from '../src/components/Footer'
@@ -18,7 +19,7 @@ import ContactButtons from '../src/components/dashboard/ContactButtons'
 import DuesTable from '../src/components/dashboard/DuesTable'
 import RoomsBoard, { bedCounts } from '../src/components/dashboard/RoomsBoard'
 import { Badge, Button, Empty, ErrorBox, Field, Notice, PageHeader, Section, Spinner, Stat, Table } from '../src/components/ui'
-import { brand, faqs, nearby } from '../src/data/site'
+import { brand, faqs, gallery, nearby } from '../src/data/site'
 
 beforeEach(resetMock)
 
@@ -628,5 +629,23 @@ describe('RoomsBoard', () => {
     db.tables.rooms = { data: null, error: new Error('rooms down') }
     render(<RoomsBoard />)
     expect(await screen.findByRole('alert')).toHaveTextContent('rooms down')
+  })
+})
+
+// ------------------------------------------------------------------ PhotoGallery
+describe('PhotoGallery', () => {
+  it('shows every real photo with its alt text, linking to the full-size file', () => {
+    render(<PhotoGallery />)
+    const list = screen.getByRole('list', { name: 'Photos of YOLO Nest' })
+    expect(within(list).getAllByRole('listitem')).toHaveLength(gallery.length)
+    gallery.forEach((p) => {
+      const img = screen.getByAltText(p.alt)
+      expect(img).toHaveAttribute('src', p.src)
+      expect(img.closest('a')).toHaveAttribute('href', p.src)
+    })
+  })
+  it('can show only the first few', () => {
+    render(<PhotoGallery limit={3} />)
+    expect(screen.getAllByRole('listitem')).toHaveLength(3)
   })
 })

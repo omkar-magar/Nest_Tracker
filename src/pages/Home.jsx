@@ -6,6 +6,7 @@ import { Button, CardGridSkeleton, ErrorBox, Section } from '../components/ui'
 import useCatalog from '../hooks/useCatalog'
 import { previewRooms } from '../services/catalog'
 import VisitForm from '../components/VisitForm'
+import PhotoGallery from '../components/PhotoGallery'
 import { brand, highlights } from '../data/site'
 import { askBeforeWhatsApp, whatsappUrl } from '../services/contact'
 
@@ -47,6 +48,10 @@ export default function Home() {
 
       <Section id="rooms-preview" title="Rooms at a glance">
         <RoomPreview />
+      </Section>
+
+      <Section id="photos" title="Inside YOLO Nest">
+        <PhotoGallery />
       </Section>
 
       <Section id="reviews" title="What residents say">

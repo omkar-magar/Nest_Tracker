@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { amenities, brand, categories, faqs, heroImages, nearby, rooms } from '../src/data/site'
+import { amenities, brand, categories, faqs, gallery, heroImages, nearby, rooms } from '../src/data/site'
 
 const root = resolve(__dirname, '..')
 
@@ -65,6 +65,26 @@ describe('amenities, hero and FAQs', () => {
   it('every FAQ has a group, a question and an answer', () => {
     faqs.forEach((f) => ['group', 'q', 'a'].forEach((k) => expect(f[k]).toBeTruthy()))
     expect(new Set(faqs.map((f) => f.q)).size).toBe(faqs.length)
+  })
+})
+
+describe('photos', () => {
+  const file = (src) => resolve(root, `public${src}`)
+  it('every gallery photo exists and has alt text and a caption', () => {
+    expect(gallery.length).toBeGreaterThan(0)
+    gallery.forEach((p) => {
+      expect(existsSync(file(p.src)), p.src).toBe(true)
+      expect(p.alt, p.src).toBeTruthy()
+      expect(p.caption, p.src).toBeTruthy()
+    })
+  })
+  it('every room has a photo, and they are not one placeholder copied to each room', () => {
+    const bytes = rooms.map((r) => {
+      const f = file(`/images/rooms/${r.id}.webp`)
+      expect(existsSync(f), r.id).toBe(true)
+      return readFileSync(f).toString('base64')
+    })
+    expect(new Set(bytes).size).toBe(rooms.length)
   })
 })
 

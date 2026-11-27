@@ -3,7 +3,8 @@
 // Security rule: this worker only ever handles SAME-ORIGIN GET requests for the app shell and static files.
 // Everything user-specific (Supabase auth, database, storage) is cross-origin, so it never passes through
 // a cache here. Nothing a signed-in user sees is stored, so a second person on the same device cannot read it.
-const VERSION = 'v1'
+// Bump when photos are replaced under the same file name, so the old copies are dropped
+const VERSION = 'v2'
 const SHELL = `yolo-shell-${VERSION}`
 const STATIC = `yolo-static-${VERSION}`
 
