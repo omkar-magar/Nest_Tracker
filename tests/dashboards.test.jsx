@@ -39,9 +39,14 @@ describe('Account page', () => {
     db.tables.customer_documents = { data: documents, error: null }
     db.tables.reviews = { data: review, error: null }
   }
-  const open = (state) => {
+  const open = (state, hash = '') => {
     asRole('customer')
-    return render(<MemoryRouter initialEntries={[{ pathname: '/account', state }]}><Account /></MemoryRouter>)
+    return render(<MemoryRouter initialEntries={[{ pathname: '/account', state, hash }]}><Account /></MemoryRouter>)
+  }
+  // documents, reviews and profile live in their own sections
+  const openSection = async (name) => {
+    open()
+    await userEvent.click(await screen.findByRole('tab', { name }))
   }
 
   it('greets the customer by name', async () => {
@@ -184,24 +189,24 @@ describe('Account page', () => {
 
     it('shows an empty message with no documents', async () => {
       seed()
-      open()
+      await openSection('Documents')
       expect(await screen.findByText('No documents uploaded yet.')).toBeInTheDocument()
     })
     it('lists uploaded documents with their type', async () => {
       seed({ documents: [doc] })
-      open()
+      await openSection('Documents')
       expect(await screen.findByText('aadhaar.pdf', { exact: false })).toBeInTheDocument()
       expect(screen.getAllByText('ID proof').length).toBeGreaterThan(0)
     })
     it('only accepts images and PDFs', async () => {
       seed()
-      open()
+      await openSection('Documents')
       const input = (await screen.findByLabelText('Upload file'))
       expect(input).toHaveAttribute('accept', 'image/jpeg,image/png,image/webp,application/pdf')
     })
     it('uploads the chosen file with the chosen type, linked to the current booking', async () => {
       seed()
-      open()
+      await openSection('Documents')
       await userEvent.selectOptions(await screen.findByLabelText('Document type'), 'address_proof')
       await userEvent.upload(screen.getByLabelText('Upload file'), new File(['x'], 'bill.pdf', { type: 'application/pdf' }))
       await waitFor(() => expect(storageBucket.upload).toHaveBeenCalled())
@@ -213,21 +218,21 @@ describe('Account page', () => {
     it('shows the error if the upload is rejected', async () => {
       storageBucket.upload.mockResolvedValueOnce({ data: null, error: new Error('File too large') })
       seed()
-      open()
+      await openSection('Documents')
       await userEvent.upload(await screen.findByLabelText('Upload file'), new File(['x'], 'big.pdf', { type: 'application/pdf' }))
       expect(await screen.findByText('File too large')).toBeInTheDocument()
     })
     it('View opens a short-lived signed link in a new tab', async () => {
       const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null)
       seed({ documents: [doc] })
-      open()
+      await openSection('Documents')
       await userEvent.click(await screen.findByRole('button', { name: 'View' }))
       await waitFor(() => expect(openSpy).toHaveBeenCalledWith('https://signed.example/file', '_blank', 'noopener'))
       expect(storageBucket.createSignedUrl).toHaveBeenCalledWith('u1/aadhaar.pdf', 60)
     })
     it('Delete confirms, then removes the row and the stored file', async () => {
       seed({ documents: [doc] })
-      open()
+      await openSection('Documents')
       await userEvent.click(await screen.findByRole('button', { name: 'Delete' }))
       expect(confirmSpy).toHaveBeenCalledWith('Delete aadhaar.pdf?')
       await waitFor(() => expect(storageBucket.remove).toHaveBeenCalledWith(['u1/aadhaar.pdf']))
@@ -235,7 +240,7 @@ describe('Account page', () => {
     it('Delete does nothing when declined', async () => {
       confirmSpy.mockReturnValue(false)
       seed({ documents: [doc] })
-      open()
+      await openSection('Documents')
       await userEvent.click(await screen.findByRole('button', { name: 'Delete' }))
       expect(storageBucket.remove).not.toHaveBeenCalled()
     })
@@ -244,13 +249,13 @@ describe('Account page', () => {
   describe('reviews', () => {
     it('cannot be left before a stay has started', async () => {
       seed({ bookings: [booking({ status: 'pending' })] })
-      open()
+      await openSection('Profile')
       expect(await screen.findByText('You can leave a review once your stay has started.')).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Submit review' })).not.toBeInTheDocument()
     })
     it('active residents can submit a rating and text', async () => {
       seed({ bookings: [booking({ status: 'active' })] })
-      open()
+      await openSection('Profile')
       await userEvent.selectOptions(await screen.findByLabelText('Rating'), '4')
       await userEvent.type(screen.getByLabelText('Your review'), 'Clean rooms and friendly staff')
       await userEvent.click(screen.getByRole('button', { name: 'Submit review' }))
@@ -260,7 +265,7 @@ describe('Account page', () => {
     })
     it('requires at least 10 characters', async () => {
       seed({ bookings: [booking({ status: 'active' })] })
-      open()
+      await openSection('Profile')
       expect(await screen.findByLabelText('Your review')).toHaveAttribute('minlength', '10')
     })
     it.each([
@@ -269,7 +274,7 @@ describe('Account page', () => {
       ['rejected', /It was not published/],
     ])('an existing %s review shows its state instead of the form', async (status, text) => {
       seed({ bookings: [booking({ status: 'active' })], review: { id: 'r1', status } })
-      open()
+      await openSection('Profile')
       expect(await screen.findByText(text)).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Submit review' })).not.toBeInTheDocument()
     })
@@ -278,7 +283,7 @@ describe('Account page', () => {
   describe('profile', () => {
     it('is prefilled and saves with digits-only phone', async () => {
       seed()
-      open()
+      await openSection('Profile')
       const name = await screen.findByLabelText('Full name')
       expect(name).toHaveValue('Test User')
       expect(screen.getByLabelText('Mobile number')).toHaveValue('9876543210')
@@ -292,6 +297,24 @@ describe('Account page', () => {
       const q = queryFor('profiles')[0]
       expect(opArgs(q, 'update')[0]).toEqual({ full_name: 'Asha Rao', phone: '919876500000' })
       expect(q.ops).toContainEqual(['eq', ['id', 'u1']])
+    })
+  })
+
+  describe('sections', () => {
+    it('opens on Stay & bills and switches sections', async () => {
+      seed()
+      open()
+      expect(await screen.findByRole('tab', { name: 'Stay & bills' })).toHaveAttribute('aria-selected', 'true')
+      expect(screen.queryByText('No documents uploaded yet.')).not.toBeInTheDocument()
+      await userEvent.click(screen.getByRole('tab', { name: 'Documents' }))
+      expect(screen.getByText('No documents uploaded yet.')).toBeInTheDocument()
+      expect(screen.queryByText('Amount paid')).not.toBeInTheDocument()
+    })
+    it('a notification link to #agreement opens the Documents section', async () => {
+      seed()
+      open(undefined, '#agreement')
+      expect(await screen.findByRole('tab', { name: 'Documents' })).toHaveAttribute('aria-selected', 'true')
+      expect(screen.getByRole('heading', { name: 'Rental agreement' })).toBeInTheDocument()
     })
   })
 })

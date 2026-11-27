@@ -150,7 +150,13 @@ function RegistrationPaid({ payment }) {
   return <p className="mt-3 text-sm text-slate-600">Registration payment: {rupees(payment.amount)} paid on {formatDate(payment.paid_at)}{payment.is_simulated ? ' (demo)' : ''}.</p>
 }
 
-const H2 = ({ children, id }) => <h2 id={id} className="mb-3 mt-10 scroll-mt-16 text-xl font-bold">{children}</h2>
+// clears the site header plus, on phones, the sticky row of section chips
+const H2 = ({ children, id }) => <h2 id={id} className="mb-3 mt-10 scroll-mt-32 text-xl font-bold lg:scroll-mt-20">{children}</h2>
+
+// The resident dashboard is split into a few sections instead of one long page.
+const SECTIONS = [['stay', 'Stay & bills'], ['requests', 'Complaints'], ['documents', 'Documents'], ['notices', 'Notices'], ['profile', 'Profile']]
+// notification links point at #anchors; open the section that holds the anchor
+const SECTION_OF = { 'my-stay': 'stay', complaints: 'requests', electricity: 'stay', documents: 'documents', agreement: 'documents' }
 
 export default function Account() {
   const { user } = useAuth()
@@ -178,7 +184,9 @@ export default function Account() {
 
 function AccountDashboard({ registration, unregistered }) {
   const { user, profile, refreshProfile } = useAuth()
-  const { state } = useLocation()
+  const { state, hash } = useLocation()
+  const [section, setSection] = useState(() => SECTION_OF[hash.slice(1)] ?? 'stay')
+  useEffect(() => { if (SECTION_OF[hash.slice(1)]) setSection(SECTION_OF[hash.slice(1)]) }, [hash])
   const { data, error, loading, reload } = useAsync(() => loadMyAccount(user.id), [user.id])
   const [paying, setPaying] = useState(null)
   const [params, setParams] = useSearchParams()
@@ -211,7 +219,7 @@ function AccountDashboard({ registration, unregistered }) {
   const showBilling = !resident || data.bookings.length > 0 || data.bills.length > 0 || data.payments.length > 0
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-8 text-navy">
+    <div className="mx-auto w-full max-w-6xl px-4 py-6 text-navy sm:py-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">Hi {profile?.full_name || 'there'}</h1>
         <NotificationBell customer />
@@ -220,102 +228,120 @@ function AccountDashboard({ registration, unregistered }) {
       {state?.justBooked && <div className="mt-4"><Notice tone="ok">Your beds are reserved. Pay the bills below to confirm your booking.</Notice></div>}
       {resident && <div className="mt-4"><Notice tone="ok">Your registration is approved. Welcome to YOLO Nest!</Notice></div>}
 
-      {resident && (
-        <>
-          <H2 id="my-stay">My stay</H2>
-          <MyStay />
-          <RegistrationPaid payment={registration.payment} />
-        </>
-      )}
+      <div className="mt-5 lg:grid lg:grid-cols-[13rem_1fr] lg:gap-8">
+        {/* sections: a left menu on wide screens, a sticky row of chips under the site header on phones */}
+        <div role="tablist" aria-label="Your account" aria-orientation="vertical"
+          className="sticky top-16 z-20 -mx-4 flex gap-2 overflow-x-auto bg-cream [scrollbar-width:none] px-4 py-2 lg:top-20 lg:mx-0 lg:flex-col lg:self-start lg:p-0">
+          {SECTIONS.map(([key, label]) => (
+            <button key={key} role="tab" aria-selected={section === key} onClick={() => setSection(key)}
+              className={`shrink-0 whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-medium focus-visible:outline-2 focus-visible:outline-navy lg:rounded-xl lg:px-3 lg:py-2 lg:text-left ${section === key ? 'bg-navy text-white' : 'border border-navy/15 bg-white text-navy hover:bg-navy/5 lg:border-transparent lg:bg-transparent'}`}>
+              {label}
+            </button>
+          ))}
+        </div>
 
-      {showBilling && <>
-      <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Amount paid" value={rupees(sum.amountPaid)} />
-        <Stat label="Outstanding" value={rupees(sum.outstanding)} tone={sum.overdue.length ? 'red' : undefined} hint={sum.overdue.length ? `${sum.overdue.length} overdue` : undefined} />
-        <Stat label="Next bill" value={sum.nextBill ? rupees(owedOn(sum.nextBill)) : '—'} />
-        <Stat label="Next due date" value={sum.nextBill ? formatDate(sum.nextBill.due_date) : '—'} tone={sum.overdue.length ? 'red' : undefined} />
+        <div role="tabpanel" aria-label={SECTIONS.find(([k]) => k === section)?.[1]} className="min-w-0 [&>h2:first-child]:mt-4 lg:[&>h2:first-child]:mt-0">
+          {section === 'stay' && <>
+            {resident && (
+              <>
+                <H2 id="my-stay">My stay</H2>
+                <MyStay />
+                <RegistrationPaid payment={registration.payment} />
+              </>
+            )}
+
+            {showBilling && <>
+              <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <Stat label="Amount paid" value={rupees(sum.amountPaid)} />
+                <Stat label="Outstanding" value={rupees(sum.outstanding)} tone={sum.overdue.length ? 'red' : undefined} hint={sum.overdue.length ? `${sum.overdue.length} overdue` : undefined} />
+                <Stat label="Next bill" value={sum.nextBill ? rupees(owedOn(sum.nextBill)) : '—'} />
+                <Stat label="Next due date" value={sum.nextBill ? formatDate(sum.nextBill.due_date) : '—'} tone={sum.overdue.length ? 'red' : undefined} />
+              </div>
+
+              <H2>Current booking</H2>
+              {live && <div className="mb-3"><NoticeToVacate booking={live} onChanged={reload} /></div>}
+              {live ? <BookingCard booking={live} onChanged={reload} /> : <Empty title="No current booking">Find a room on the <Link className="underline" to="/rooms">Rooms page</Link>.</Empty>}
+
+              <H2>Bills</H2>
+              {sum.nextBill && <div className="mb-3"><Button variant="sun" onClick={() => setPaying(sum.nextBill)}>Pay next bill · {rupees(owedOn(sum.nextBill))}</Button></div>}
+              {data.bills.length === 0 ? <Empty title="No bills yet" /> : (
+                <Table head={['Description', 'Amount', 'Due', 'Status', '']}>
+                  {data.bills.map((b) => (
+                    <tr key={b.id}>
+                      <td className="px-4 py-3">{b.description}</td>
+                      <td className="px-4 py-3">{rupees(b.amount)}{b.amount_paid > 0 && b.status === 'unpaid' && <span className="block text-xs text-slate-500">{rupees(owedOn(b))} left</span>}</td>
+                      <td className="px-4 py-3">{formatDate(b.due_date)}{daysOverdue(b) > 0 && <span className="block text-xs text-red-700">{daysOverdue(b)} days late</span>}</td>
+                      <td className="px-4 py-3"><Badge tone={billTone[billLabel(b)]}>{billLabel(b)}</Badge></td>
+                      <td className="px-4 py-3 text-right"><span className="inline-flex gap-1">{b.status === 'unpaid' && <Button variant="outline" className="!py-1" onClick={() => setPaying(b)}>Pay</Button>}{b.invoice_no && <Button variant="outline" className="!py-1" onClick={() => invoicePdf({ bill: b, tenant: profile, room: live?.rooms?.room_no })}>PDF</Button>}</span></td>
+                    </tr>
+                  ))}
+                </Table>
+              )}
+
+              <H2>Payment history</H2>
+              {data.payments.length === 0 ? <Empty title="No payments yet" /> : (
+                <Table head={['Date', 'For', 'Amount', 'Method', 'Result', '']}>
+                  {data.payments.map((p) => (
+                    <tr key={p.id}>
+                      <td className="px-4 py-3">{formatDateTime(p.created_at)}</td>
+                      <td className="px-4 py-3">{p.bills?.description}</td>
+                      <td className="px-4 py-3">{rupees(p.amount)}</td>
+                      <td className="px-4 py-3">{p.is_simulated ? <Badge tone="amber">Demo (simulated)</Badge> : p.provider}</td>
+                      <td className="px-4 py-3"><Badge tone={p.status === 'succeeded' ? 'green' : p.status === 'failed' ? 'red' : 'gray'}>{p.status}</Badge></td>
+                      <td className="px-4 py-3 text-right">{p.status === 'succeeded' && <Button variant="outline" className="!py-1" onClick={() => receiptPdf({ payment: p, bill: p.bills, tenant: profile })}>Receipt</Button>}</td>
+                    </tr>
+                  ))}
+                </Table>
+              )}
+            </>}
+
+            <H2 id="electricity">Electricity bill</H2>
+            <MyElectricity />
+
+            {past.length > 0 && (
+              <>
+                <H2>Booking history</H2>
+                <Table head={['Room', 'Dates', 'Status']}>
+                  {past.map((b) => (
+                    <tr key={b.id}>
+                      <td className="px-4 py-3">Room {b.rooms.room_no}</td>
+                      <td className="px-4 py-3">{formatDate(b.check_in)}{b.check_out ? ` to ${formatDate(b.check_out)}` : ''}</td>
+                      <td className="px-4 py-3"><Badge>{b.status}</Badge></td>
+                    </tr>
+                  ))}
+                </Table>
+              </>
+            )}
+          </>}
+
+          {section === 'requests' && <>
+            <H2 id="complaints">Complaints</H2>
+            <MyComplaints />
+          </>}
+
+          {section === 'documents' && <>
+            <H2 id="documents">Documents</H2>
+            <Documents docs={data.documents} userId={user.id} bookingId={live?.id} onChanged={reload} />
+            <H2 id="agreement">Rental agreement</H2>
+            <MyAgreement />
+          </>}
+
+          {section === 'notices' && <>
+            <H2>Notices</H2>
+            <OfficeNotices />
+          </>}
+
+          {section === 'profile' && <>
+            <H2>Your details</H2>
+            <Card><ProfileForm profile={profile} onSaved={refreshProfile} /></Card>
+            <H2>Emergency contacts and other details</H2>
+            <TenantDetails />
+            <H2>Leave a review</H2>
+            <ReviewBox existing={data.review} hasStay={hasStay} userId={user.id} name={profile?.full_name || 'Resident'} onChanged={reload} />
+            {hasStay && <GoogleReviewLink />}
+          </>}
+        </div>
       </div>
-
-      <H2>Current booking</H2>
-      {live && <div className="mb-3"><NoticeToVacate booking={live} onChanged={reload} /></div>}
-      {live ? <BookingCard booking={live} onChanged={reload} /> : <Empty title="No current booking">Find a room on the <Link className="underline" to="/rooms">Rooms page</Link>.</Empty>}
-
-      </>}
-
-      <H2 id="electricity">Electricity bill</H2>
-      <MyElectricity />
-
-      {showBilling && <>
-      <H2>Bills</H2>
-      {sum.nextBill && <div className="mb-3"><Button variant="sun" onClick={() => setPaying(sum.nextBill)}>Pay next bill · {rupees(owedOn(sum.nextBill))}</Button></div>}
-      {data.bills.length === 0 ? <Empty title="No bills yet" /> : (
-        <Table head={['Description', 'Amount', 'Due', 'Status', '']}>
-          {data.bills.map((b) => (
-            <tr key={b.id}>
-              <td className="px-4 py-3">{b.description}</td>
-              <td className="px-4 py-3">{rupees(b.amount)}{b.amount_paid > 0 && b.status === 'unpaid' && <span className="block text-xs text-slate-500">{rupees(owedOn(b))} left</span>}</td>
-              <td className="px-4 py-3">{formatDate(b.due_date)}{daysOverdue(b) > 0 && <span className="block text-xs text-red-700">{daysOverdue(b)} days late</span>}</td>
-              <td className="px-4 py-3"><Badge tone={billTone[billLabel(b)]}>{billLabel(b)}</Badge></td>
-              <td className="px-4 py-3 text-right"><span className="inline-flex gap-1">{b.status === 'unpaid' && <Button variant="outline" className="!py-1" onClick={() => setPaying(b)}>Pay</Button>}{b.invoice_no && <Button variant="outline" className="!py-1" onClick={() => invoicePdf({ bill: b, tenant: profile, room: live?.rooms?.room_no })}>PDF</Button>}</span></td>
-            </tr>
-          ))}
-        </Table>
-      )}
-
-      <H2>Payment history</H2>
-      {data.payments.length === 0 ? <Empty title="No payments yet" /> : (
-        <Table head={['Date', 'For', 'Amount', 'Method', 'Result', '']}>
-          {data.payments.map((p) => (
-            <tr key={p.id}>
-              <td className="px-4 py-3">{formatDateTime(p.created_at)}</td>
-              <td className="px-4 py-3">{p.bills?.description}</td>
-              <td className="px-4 py-3">{rupees(p.amount)}</td>
-              <td className="px-4 py-3">{p.is_simulated ? <Badge tone="amber">Demo (simulated)</Badge> : p.provider}</td>
-              <td className="px-4 py-3"><Badge tone={p.status === 'succeeded' ? 'green' : p.status === 'failed' ? 'red' : 'gray'}>{p.status}</Badge></td>
-              <td className="px-4 py-3 text-right">{p.status === 'succeeded' && <Button variant="outline" className="!py-1" onClick={() => receiptPdf({ payment: p, bill: p.bills, tenant: profile })}>Receipt</Button>}</td>
-            </tr>
-          ))}
-        </Table>
-      )}
-
-      </>}
-
-      <H2 id="documents">Documents</H2>
-      <Documents docs={data.documents} userId={user.id} bookingId={live?.id} onChanged={reload} />
-
-      {past.length > 0 && (
-        <>
-          <H2>Booking history</H2>
-          <Table head={['Room', 'Dates', 'Status']}>
-            {past.map((b) => (
-              <tr key={b.id}>
-                <td className="px-4 py-3">Room {b.rooms.room_no}</td>
-                <td className="px-4 py-3">{formatDate(b.check_in)}{b.check_out ? ` to ${formatDate(b.check_out)}` : ''}</td>
-                <td className="px-4 py-3"><Badge>{b.status}</Badge></td>
-              </tr>
-            ))}
-          </Table>
-        </>
-      )}
-
-      <H2 id="complaints">Complaints</H2>
-      <MyComplaints />
-
-      <H2 id="agreement">Rental agreement</H2>
-      <MyAgreement />
-
-      <H2>Notices</H2>
-      <OfficeNotices />
-
-      <H2>Your details</H2>
-      <Card><ProfileForm profile={profile} onSaved={refreshProfile} /></Card>
-
-      <H2>Emergency contacts and other details</H2>
-      <TenantDetails />
-
-      <H2>Leave a review</H2>
-      <ReviewBox existing={data.review} hasStay={hasStay} userId={user.id} name={profile?.full_name || 'Resident'} onChanged={reload} />
-      {hasStay && <GoogleReviewLink />}
 
       {paying && <PayModal bill={paying} onClose={() => setPaying(null)} onFinished={reload} />}
     </div>
