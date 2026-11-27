@@ -242,6 +242,11 @@ export const ownerDashboard = (pid) => rpc('owner_dashboard', { p_property: pid 
 export const runJobs = (force = false) => rpc('run_scheduled_jobs', { p_force: force })
 export const setSetting = (key, value) => rpc('admin_set_setting', { p_key: key, p_value: value })
 export const loadSettings = () => rows('app_settings', '*')
-export const loadMyNotifications = (userId) =>
+// Kinds only staff are sent. Staff alerts also always link into /admin or /staff.
+const STAFF_KINDS = ['lead', 'follow_up', 'visit', 'leave', 'payslip', 'report']
+export const isCustomerNotice = (n) => !STAFF_KINDS.includes(n.kind) && !/^\/(admin|staff)\b/.test(n.link || '')
+// customer: true keeps only customer-facing notices, so a manager alert never shows on /account
+export const loadMyNotifications = (userId, { customer = false } = {}) =>
   rows('notifications', '*', (q) => q.eq('user_id', userId).eq('channel', 'in_app').order('created_at', { ascending: false }).limit(50))
+    .then((list) => (customer ? (list ?? []).filter(isCustomerNotice) : list))
 export const markNotificationsRead = (ids) => rpc('mark_notifications_read', { p_ids: ids ?? null })

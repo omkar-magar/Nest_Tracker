@@ -214,7 +214,7 @@ function AccountDashboard({ registration, unregistered }) {
     <div className="mx-auto w-full max-w-5xl px-4 py-8 text-navy">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">Hi {profile?.full_name || 'there'}</h1>
-        <NotificationBell />
+        <NotificationBell customer />
       </div>
       {unregistered && <div className="mt-4"><Notice tone="warn">You have not sent your registration form yet. <Link className="font-semibold underline" to="/signup">Fill in the registration form</Link> to choose your room.</Notice></div>}
       {state?.justBooked && <div className="mt-4"><Notice tone="ok">Your beds are reserved. Pay the bills below to confirm your booking.</Notice></div>}

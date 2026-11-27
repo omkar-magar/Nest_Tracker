@@ -7,9 +7,10 @@ import { disablePush, enablePush, pushState, pushSupported } from '../services/p
 import { formatDateTime } from '../services/format'
 
 // In-app inbox (notifications with channel 'in_app') plus the switch for phone push alerts.
-export default function NotificationBell() {
+// customer: the bell on /account shows only customer-facing notices.
+export default function NotificationBell({ customer = false }) {
   const { user } = useAuth()
-  const { data, reload } = useAsync(() => loadMyNotifications(user.id).catch(() => []), [user.id])
+  const { data, reload } = useAsync(() => loadMyNotifications(user.id, { customer }).catch(() => []), [user.id, customer])
   const [open, setOpen] = useState(false)
   const [push, setPush] = useState('unsupported')
   const [err, setErr] = useState('')
