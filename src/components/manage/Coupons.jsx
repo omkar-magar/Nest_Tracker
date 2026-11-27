@@ -1,10 +1,21 @@
 import { useState } from 'react'
 import useAsync from '../../hooks/useAsync'
-import { ActionMsg, Small, useAction, useScope } from './kit'
+import { useAuth } from '../../context/AuthContext'
+import { ActionMsg, ScopeProvider, Small, useAction, useScope } from './kit'
 import { Badge, Button, Empty, ErrorBox, TableSkeleton } from '../ui'
 import { formatDate } from '../../services/format'
 import { couponMessage, couponValue, couponWhatsapp, couponsList, setCouponActive } from '../../services/coupons'
+import { loadProperties, loadStartProperty } from '../../services/manage'
 import CouponForm from './CouponForm'
+
+// For pages outside the console (the manager's page): loads the wings so the coupon form can offer them.
+export function WingCoupons() {
+  const { user } = useAuth()
+  const q = useAsync(() => Promise.all([loadProperties(), loadStartProperty(user?.id)]), [user?.id])
+  if (q.loading) return <TableSkeleton />
+  if (q.error) return <ErrorBox error={q.error} onRetry={q.reload} />
+  return <ScopeProvider properties={q.data[0]} initial={q.data[1]}><Coupons /></ScopeProvider>
+}
 
 // Coupons for exclusive offers. Managers see their wings' coupons; the owner sees every coupon, with who made it.
 export default function Coupons() {

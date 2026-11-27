@@ -6,6 +6,7 @@ import DuesTable from '../../components/dashboard/DuesTable'
 import DataTable from '../../components/manage/DataTable'
 import NotificationBell from '../../components/NotificationBell'
 import GuestRegister from '../../components/register/GuestRegister'
+import { WingCoupons } from '../../components/manage/Coupons'
 import { STATUS_TEXT, departures, registerSummary } from '../../services/register'
 import { ActionMsg, H3, Load, Small, StatusBadge, useAction } from '../../components/manage/kit'
 import { Button, Empty, ErrorBox, Notice, Spinner, Stat } from '../../components/ui'
@@ -173,6 +174,7 @@ function Customers() {
 
 const TABS = [['register', 'Guest register', 'Work', 'list'], ['today', 'Today', 'Work', 'home'], ['team', 'Team', 'Work', 'users'],
   ['complaints', 'Complaints', 'Work', 'wrench'], ['rooms', 'Rooms and beds', 'Work', 'bed'], ['customers', 'Customers and dues', 'Work', 'rupee'],
+  ['coupons', 'Coupons', 'Work', 'tag'],
   ['me', 'My attendance', 'Me', 'clock'], ['leave', 'My leave', 'Me', 'calendar'], ['payslips', 'Payslips', 'Me', 'receipt'], ['notices', 'Notices', 'Me', 'bell']]
 // check-in forms, billing, payroll and reports live in the full console
 const LINKS = [['/admin', 'Full console', 'sliders']]
@@ -188,6 +190,7 @@ export default function ManagerDashboard() {
       {tab === 'complaints' && <OpenComplaints />}
       {tab === 'rooms' && <RoomsBoard canManage />}
       {tab === 'customers' && <Customers />}
+      {tab === 'coupons' && <WingCoupons />}
       {tab === 'me' && <Today />}
       {tab === 'leave' && <MyLeave />}
       {tab === 'payslips' && <MyPayslips />}

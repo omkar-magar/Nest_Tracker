@@ -1,5 +1,5 @@
 // Coupons: managers make and share them; guests apply a code on the registration payment.
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('../src/context/AuthContext', () => import('./helpers/authMock.js'))
@@ -10,6 +10,8 @@ import Coupons from '../src/components/manage/Coupons'
 import RegistrationPay from '../src/components/register/RegistrationPay'
 import { ScopeProvider } from '../src/components/manage/kit'
 import { couponMessage } from '../src/services/coupons'
+import App from '../src/App'
+import ManagerDashboard from '../src/pages/staff/ManagerDashboard'
 
 const scoped = (page) => render(<MemoryRouter><ScopeProvider properties={[{ id: 'P1', name: 'A wing', wing: 'A' }]} initial="P1">{page}</ScopeProvider></MemoryRouter>)
 beforeEach(() => resetMock())
@@ -62,5 +64,48 @@ describe('guest applies a coupon', () => {
     fireEvent.change(screen.getByLabelText('Coupon code'), { target: { value: 'LEAD10' } })
     fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('another mobile number')
+  })
+})
+
+describe('coupons tab', () => {
+  const wings = () => {
+    db.tables.properties = { data: [{ id: 'P1', name: 'A wing' }, { id: 'P2', name: 'B wing' }], error: null }
+    db.tables.property_members = { data: [{ property_id: 'P2', is_default: true }], error: null }
+    db.rpcs.coupons_list = { data: [] }
+  }
+  const openConsole = (role, path = '/admin') => {
+    asRole(role)
+    wings()
+    return render(<MemoryRouter initialEntries={[path]}><App /></MemoryRouter>)
+  }
+  it('is in the console menu for the owner and managers, not for sales', async () => {
+    for (const role of ['admin', 'manager']) {
+      const { unmount } = openConsole(role)
+      const nav = await screen.findByRole('navigation', { name: 'Modules' })
+      expect(within(nav).getByRole('link', { name: 'Coupons' })).toHaveAttribute('href', '/admin/coupons')
+      unmount()
+    }
+    openConsole('sales')
+    const nav = await screen.findByRole('navigation', { name: 'Modules' })
+    expect(within(nav).queryByRole('link', { name: 'Coupons' })).not.toBeInTheDocument()
+  })
+  it('opens on its own page in the console and is closed to sales', async () => {
+    const { unmount } = openConsole('manager', '/admin/coupons')
+    expect(await screen.findByRole('button', { name: 'New coupon' })).toBeInTheDocument()
+    unmount()
+    openConsole('sales', '/admin/coupons')
+    expect(await screen.findByText('Your account (sales) cannot open this area.')).toBeInTheDocument()
+  })
+  it('is a tab on the manager page, with the wings to choose from', async () => {
+    asRole('manager')
+    wings()
+    db.rpcs.create_coupon = { data: 'B500' }
+    render(<MemoryRouter><ManagerDashboard /></MemoryRouter>)
+    fireEvent.click(screen.getByRole('tab', { name: 'Coupons' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'New coupon' }))
+    expect(screen.getByRole('option', { name: 'B wing' })).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Amount off (₹) *'), { target: { value: '500' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Create coupon' }))
+    await waitFor(() => expect(supabase.rpc).toHaveBeenCalledWith('create_coupon', { p: expect.objectContaining({ value: '500', property_id: 'P2' }) }))
   })
 })

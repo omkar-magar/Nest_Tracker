@@ -43,6 +43,7 @@ const Expenses = lazy(() => import('./pages/manage/Expenses'))
 const Complaints = lazy(() => import('./pages/manage/Complaints'))
 const Enquiries = lazy(() => import('./pages/manage/Enquiries'))
 const EnquiryDetail = lazy(() => import('./pages/manage/EnquiryDetail'))
+const Coupons = lazy(() => import('./components/manage/Coupons'))
 const Sales = lazy(() => import('./pages/manage/Sales'))
 const Staff = lazy(() => import('./pages/manage/Staff'))
 const Reports = lazy(() => import('./pages/manage/Reports'))
@@ -153,6 +154,7 @@ export default function App() {
             <Route path="complaints" element={only(MANAGE, <Complaints />)} />
             <Route path="enquiries" element={<Enquiries />} />
             <Route path="enquiries/:id" element={<EnquiryDetail />} />
+            <Route path="coupons" element={only(MANAGE, <Coupons />)} />
             <Route path="sales" element={<Sales />} />
             <Route path="staff" element={only(MANAGE, <Staff />)} />
             <Route path="reports" element={only(MANAGE, <Reports />)} />

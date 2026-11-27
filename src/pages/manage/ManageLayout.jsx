@@ -23,6 +23,7 @@ export const MODULES = [
   ['billing', 'Rent & payments', ['admin', 'manager'], 'Money', 'rupee'],
   ['expenses', 'Expenses', ['admin', 'manager'], 'Money', 'receipt'],
   ['enquiries', 'Enquiries', ['admin', 'manager', 'sales'], 'Sales', 'chat'],
+  ['coupons', 'Coupons', ['admin', 'manager'], 'Sales', 'tag'],
   ['sales', 'Marketing & sales', ['admin', 'manager', 'sales'], 'Sales', 'megaphone'],
   ['properties', 'Properties & rooms', ['admin', 'manager'], 'Property', 'building'],
   ['inventory', 'Inventory', ['admin', 'manager'], 'Property', 'box'],
