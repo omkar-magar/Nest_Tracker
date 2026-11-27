@@ -203,8 +203,9 @@ describe('guest register screen', () => {
     const table = await screen.findByRole('table', { name: 'Guest register' })
     const heads = within(table).getAllByRole('columnheader')
     expect(heads.map((h) => h.textContent)).toEqual(['Sr', 'Room', 'Type', 'Guest', 'Contact', 'Rent status', 'Check-in', 'Expected check-out', 'Details'])
-    // phones keep room, name and rent status (plus the Details button)
-    expect(heads.filter((h) => !h.className.includes('hidden')).map((h) => h.textContent)).toEqual(['Room', 'Guest', 'Rent status', 'Details'])
+    // phones keep room, name and rent status; the name opens Details there, so no sticky column covers the status
+    expect(heads.filter((h) => !h.className.includes('hidden')).map((h) => h.textContent)).toEqual(['Room', 'Guest', 'Rent status'])
+    expect(within(table).getByRole('button', { name: 'Amit Rao' })).toHaveAttribute('aria-haspopup', 'dialog')
     expect(within(table).queryByRole('button', { name: /Add guest to room|Check out/ })).not.toBeInTheDocument()
     await user.click(within(table).getByRole('button', { name: 'Details, Amit Rao' }))
     const dialog = screen.getByRole('dialog', { name: 'Guest details: Amit Rao' })

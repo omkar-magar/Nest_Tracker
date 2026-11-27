@@ -49,7 +49,8 @@ export default function NotificationBell({ customer = false }) {
         {unread.length > 0 && <span className="absolute -right-1 -top-1 rounded-full bg-red-600 px-1.5 text-[10px] font-bold text-white">{unread.length}</span>}
       </button>
       {open && (
-        <div className="absolute right-0 z-40 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-navy/10 bg-white p-3 text-sm text-navy shadow-lg">
+        // phones: pinned to the screen edges, so it never runs off the side whatever the bell's position
+        <div className="fixed inset-x-3 top-16 z-40 rounded-2xl sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[22rem] border border-navy/10 bg-white p-3 text-sm text-navy shadow-lg">
           <div className="mb-2 flex items-center justify-between gap-2">
             <p className="font-semibold">Notifications</p>
             {push !== 'unsupported' && (

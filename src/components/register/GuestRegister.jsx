@@ -118,6 +118,7 @@ function Current({ pid, list, setList, rooms, roomNos, canEdit, reload }) {
   const [depF, setDepF] = useState('')
   const [kindF, setKindF] = useState('')
   const [soon, setSoon] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
   const [adding, setAdding] = useState(null)
   const [leaving, setLeaving] = useState(null)
   const [details, setDetails] = useState(null)
@@ -152,7 +153,7 @@ function Current({ pid, list, setList, rooms, roomNos, canEdit, reload }) {
 
   return (
     <div>
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-5" aria-live="polite">
+      <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:grid-cols-5" aria-live="polite">
         <Stat label="Guests staying" value={sum.people} hint={sum.rentPending ? `${sum.rentPending} with rent pending` : undefined} />
         <Stat label="Rooms occupied" value={`${sum.occupiedRooms}/${sum.totalRooms}`} />
         <Stat label="PG rooms" value={sum.pgRooms} hint={`${people(sum.pgPeople)} sharing`} />
@@ -163,28 +164,41 @@ function Current({ pid, list, setList, rooms, roomNos, canEdit, reload }) {
       <div className="mt-4 flex flex-wrap gap-2">
         {canEdit && <Button variant="sun" onClick={() => setAdding({})}>+ Add guest</Button>}
         {canEdit && view === 'rooms' && <Button variant="outline" aria-pressed={edit} onClick={() => setEdit(!edit)}>{edit ? 'Edit mode: on (saves as you type)' : 'Edit mode: off'}</Button>}
-        <Button variant="outline" onClick={() => exportExcel('Guest register', exportRows, EXPORT_COLS(kindOf))}>Export Excel</Button>
-        <Button variant="outline" onClick={() => a.run(() => exportPDF('Guest register', exportRows, EXPORT_COLS(kindOf),
-          `${sum.people} guests · ${sum.occupiedRooms}/${sum.totalRooms} rooms occupied · PG ${sum.pgRooms} rooms (${sum.pgPeople} people) · rented ${sum.rentedRooms}`))}>Export PDF</Button>
-        {canEdit && <Button variant="outline" disabled={a.busy} onClick={backup}>Backup (JSON)</Button>}
+        {/* the three downloads share one menu */}
+        <details className="relative">
+          <summary className="inline-flex cursor-pointer list-none items-center rounded-full border border-navy/30 px-5 py-2 text-sm font-semibold hover:bg-navy/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy [&::-webkit-details-marker]:hidden">Export ▾</summary>
+          <div className="absolute left-0 z-20 mt-1 w-48 rounded-2xl border border-navy/10 bg-white p-1 shadow-lg">
+            <button className={menuItem} onClick={() => exportExcel('Guest register', exportRows, EXPORT_COLS(kindOf))}>Export Excel</button>
+            <button className={menuItem} onClick={() => a.run(() => exportPDF('Guest register', exportRows, EXPORT_COLS(kindOf),
+              `${sum.people} guests · ${sum.occupiedRooms}/${sum.totalRooms} rooms occupied · PG ${sum.pgRooms} rooms (${sum.pgPeople} people) · rented ${sum.rentedRooms}`))}>Export PDF</button>
+            {canEdit && <button className={menuItem} disabled={a.busy} onClick={backup}>Backup (JSON)</button>}
+          </div>
+        </details>
       </div>
       <div className="mt-2"><ActionMsg action={a} /></div>
 
       <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-5" role="search">
-        <label className="lg:col-span-2"><span className="sr-only">Search</span>
-          <input type="search" className={inputCls} placeholder="Search name, contact or room" value={q} onChange={(e) => setQ(e.target.value)} />
-        </label>
-        <label><span className="sr-only">Rent status</span>
+        <div className="flex gap-2 lg:col-span-2">
+          <label className="flex-1"><span className="sr-only">Search</span>
+            <input type="search" className={inputCls} placeholder="Search name, contact or room" value={q} onChange={(e) => setQ(e.target.value)} />
+          </label>
+          {/* phones: the three status filters fold away behind this button */}
+          <button type="button" aria-expanded={showFilters} onClick={() => setShowFilters(!showFilters)}
+            className="shrink-0 rounded-xl border border-navy/20 bg-white px-3 text-sm font-medium focus-visible:outline-2 focus-visible:outline-navy sm:hidden">
+            Filters{rentF || depF || kindF ? ' •' : ''}
+          </button>
+        </div>
+        <label className={showFilters ? '' : 'max-sm:hidden'}><span className="sr-only">Rent status</span>
           <select className={inputCls} value={rentF} onChange={(e) => setRentF(e.target.value)}>
             <option value="">All rent statuses</option>{r.STATUSES.map((s) => <option key={s} value={s}>Rent: {r.STATUS_TEXT[s]}</option>)}
           </select>
         </label>
-        <label><span className="sr-only">Deposit status</span>
+        <label className={showFilters ? '' : 'max-sm:hidden'}><span className="sr-only">Deposit status</span>
           <select className={inputCls} value={depF} onChange={(e) => setDepF(e.target.value)}>
             <option value="">All deposit statuses</option>{r.STATUSES.map((s) => <option key={s} value={s}>Deposit: {r.STATUS_TEXT[s]}</option>)}
           </select>
         </label>
-        <label><span className="sr-only">Room type</span>
+        <label className={showFilters ? '' : 'max-sm:hidden'}><span className="sr-only">Room type</span>
           <select className={inputCls} value={kindF} onChange={(e) => setKindF(e.target.value)}>
             <option value="">All rooms</option><option value="pg">PG rooms</option><option value="rented">Rented rooms</option><option value="empty">Empty rooms</option>
           </select>
@@ -288,6 +302,7 @@ function GuestItem({ g, edit, canEdit, roomNos, onSaved, onCheckout }) {
 // On phones only room, name and rent status show. Empty rooms only show when filtered for.
 const COLS = [['Sr'], ['Room', true], ['Type'], ['Guest', true], ['Contact'], ['Rent status', true], ['Check-in'], ['Expected check-out']]
 const td = 'px-3 py-2 align-top'
+const menuItem = 'block w-full rounded-xl px-3 py-2 text-left text-sm font-medium hover:bg-navy/5 focus-visible:outline-2 focus-visible:outline-navy disabled:opacity-50'
 const wide = 'hidden sm:table-cell' // columns left out on phones
 const STICKY = 'sticky right-0 whitespace-nowrap shadow-[-6px_0_6px_-6px_rgba(0,0,0,0.15)]'
 const shortKind = (room) => (room.kind === 'pg' ? `PG · ${room.people}` : room.kind === 'rented' ? 'Rented' : 'Empty')
@@ -304,7 +319,7 @@ function GuestTable({ rooms, onDetails }) {
         <thead className="border-b border-navy/10 bg-cream text-xs uppercase tracking-wide text-slate-500">
           <tr>
             {COLS.map(([h, phone]) => <th key={h} scope="col" className={`whitespace-nowrap px-3 py-2.5 font-semibold ${phone ? '' : wide}`}>{h}</th>)}
-            <th scope="col" className={`${STICKY} bg-cream px-3 py-2.5`}><span className="sr-only">Details</span></th>
+            <th scope="col" className={`${STICKY} ${wide} bg-cream px-3 py-2.5`}><span className="sr-only">Details</span></th>
           </tr>
         </thead>
         {rooms.map((room) => {
@@ -323,14 +338,18 @@ function GuestTable({ rooms, onDetails }) {
                   {!g ? <td colSpan={COLS.length - 2} className={`${td} italic text-slate-500`}>No guest</td> : (
                     <>
                       <td className={`${td} font-medium`}>
-                        {g.name || <span className="italic text-slate-500">Unnamed entry</span>}
+                        {/* phones have no Details column (it covered the status): the name opens the popup */}
+                        <button type="button" aria-haspopup="dialog" onClick={() => onDetails(g.id)}
+                          className="text-left underline decoration-navy/30 underline-offset-4 hover:decoration-navy focus-visible:outline-2 focus-visible:outline-navy sm:no-underline">
+                          {g.name || <span className="italic text-slate-500">Unnamed entry</span>}
+                        </button>
                         {r.leavingSoon(g) && <span className="mt-1 block"><Badge tone="amber">Leaving soon</Badge></span>}
                       </td>
                       <td className={`${td} ${wide} whitespace-nowrap`}>{g.contact ? <a href={`tel:${g.contact}`} className="underline focus-visible:outline-2 focus-visible:outline-navy">{g.contact}</a> : '—'}</td>
                       <td className={`${td} whitespace-nowrap`}><StatusPill value={g.rent_status} /></td>
                       <td className={`${td} ${wide} whitespace-nowrap`}>{g.check_in ? formatDate(g.check_in) : '—'}</td>
                       <td className={`${td} ${wide} whitespace-nowrap`}>{g.expected_checkout ? formatDate(g.expected_checkout) : '—'}</td>
-                      <td className={`${td} ${STICKY} bg-white`}>
+                      <td className={`${td} ${STICKY} ${wide} bg-white`}>
                         <button type="button" aria-haspopup="dialog" aria-label={`Details, ${g.name || 'unnamed entry'}`} onClick={() => onDetails(g.id)}
                           className="rounded-full border border-navy/30 px-3 py-1 text-xs font-semibold text-navy hover:bg-navy/5 focus-visible:outline-2 focus-visible:outline-navy">Details</button>
                       </td>
@@ -381,7 +400,7 @@ function GuestDetails({ g, room, canEdit, roomNos, onSaved, onCheckout, onClose 
           </div>
           <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs text-slate-600">Changes save as you leave each field.</p>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {r.occupies(g) && <Button variant="outline" onClick={() => setExtending(true)}>Extend stay</Button>}
               <Button variant="danger" onClick={() => onCheckout(g)}>{r.occupies(g) ? 'Check out' : 'Remove'}</Button>
               <Button variant="outline" onClick={onClose}>Done</Button>

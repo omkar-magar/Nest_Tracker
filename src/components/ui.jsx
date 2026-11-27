@@ -101,9 +101,9 @@ export const Card = ({ className = '', ...rest }) => (
 )
 
 export const Stat = ({ label, value, hint, tone }) => (
-  <Card>
-    <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
-    <p className={`mt-1 text-2xl font-bold ${tone === 'red' ? 'text-red-700' : 'text-navy'}`}>{value}</p>
+  <Card className="!p-3 sm:!p-5">
+    <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500 sm:text-xs">{label}</p>
+    <p className={`mt-1 text-xl font-bold sm:text-2xl ${tone === 'red' ? 'text-red-700' : 'text-navy'}`}>{value}</p>
     {hint && <p className="mt-0.5 text-xs text-slate-500">{hint}</p>}
   </Card>
 )
