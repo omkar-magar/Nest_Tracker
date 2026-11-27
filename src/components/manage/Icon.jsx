@@ -24,6 +24,18 @@ const PATHS = {
   food: 'M7 3v8M5 3v5a2 2 0 0 0 4 0V3M7 11v10M17 3c-2 0-3 2-3 6h3v12',
   box: 'M3 7l9-4 9 4-9 4zM3 7v10l9 4 9-4V7M12 11v10',
   search: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM21 21l-5-5',
+  menu: 'M4 6h16M4 12h16M4 18h16',
+  logout: 'M15 4h4v16h-4M10 8l-4 4 4 4M6 12h11',
+  close: 'M6 6l12 12M18 6L6 18',
+  home: 'M3 11l9-7 9 7M5 10v10h14V10M10 20v-6h4v6',
+  pulse: 'M3 12h4l3-8 4 16 3-8h4',
+  list: 'M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01',
+  chat: 'M4 5h16v11H9l-5 4z',
+  megaphone: 'M3 10v4l12 5V5zM15 9a3 3 0 0 1 0 6M6 15l1.5 5h3l-1.5-4',
+  building: 'M4 21V5l8-3v19M12 9h8v12M2 21h20M8 8h.01M8 12h.01M8 16h.01M16 13h.01M16 17h.01',
+  user: 'M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0',
+  sliders: 'M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1M15 4v4M9 10v4M17 16v4',
+  globe: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18',
 }
 
 export default function Icon({ name, className = 'h-5 w-5' }) {

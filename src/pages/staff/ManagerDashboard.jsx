@@ -33,10 +33,8 @@ function Overview() {
           <div>
             <div className="flex flex-wrap gap-2">
               <Button to="/admin/checkin" variant="sun">Check in a tenant</Button>
-              <Button to="/admin/register" variant="outline">Guest register</Button>
               <Button to="/admin/billing" variant="outline">Record a payment</Button>
               <Button to="/admin/tenants" variant="outline">Tenants</Button>
-              <Button to="/admin" variant="outline">Full console</Button>
             </div>
             <H3>Guests and rooms</H3>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -173,14 +171,17 @@ function Customers() {
   return <DuesTable rows={data} />
 }
 
-const TABS = [['register', 'Guest register'], ['today', 'Today'],['team', 'Team'], ['complaints', 'Complaints'], ['rooms', 'Rooms and beds'], ['customers', 'Customers and dues'],
-  ['me', 'My attendance'], ['leave', 'My leave'], ['payslips', 'Payslips'], ['notices', 'Notices']]
+const TABS = [['register', 'Guest register', 'Work', 'list'], ['today', 'Today', 'Work', 'home'], ['team', 'Team', 'Work', 'users'],
+  ['complaints', 'Complaints', 'Work', 'wrench'], ['rooms', 'Rooms and beds', 'Work', 'bed'], ['customers', 'Customers and dues', 'Work', 'rupee'],
+  ['me', 'My attendance', 'Me', 'clock'], ['leave', 'My leave', 'Me', 'calendar'], ['payslips', 'Payslips', 'Me', 'receipt'], ['notices', 'Notices', 'Me', 'bell']]
+// check-in forms, billing, payroll and reports live in the full console
+const LINKS = [['/admin', 'Full console', 'sliders']]
 
 export default function ManagerDashboard() {
   // the guest register is the first thing a manager sees (a ?changes= link from the AI guide lands there too)
   const [tab, setTab] = useState('register')
   return (
-    <Shell title="Manager" tabs={TABS} tab={tab} onTab={setTab} actions={<NotificationBell />}>
+    <Shell title="Manager" tabs={TABS} links={LINKS} tab={tab} onTab={setTab} actions={<NotificationBell />}>
       {tab === 'today' && <Overview />}
       {tab === 'register' && <GuestRegister />}
       {tab === 'team' && <Team />}

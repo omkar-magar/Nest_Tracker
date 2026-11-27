@@ -46,6 +46,20 @@ describe('/staff picks a page by role and designation', () => {
     expect(screen.getByRole('tab', { name: 'Guest register' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getAllByRole('tab')[0]).toHaveAccessibleName('Guest register')
   })
+  it('the manager menu groups tabs, links to the console and closes after a pick', async () => {
+    asRole('manager')
+    go('/staff/manager')
+    const menu = await screen.findByRole('button', { name: 'Open menu' })
+    expect(menu).toHaveAttribute('aria-expanded', 'false')
+    await userEvent.click(menu)
+    expect(menu).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('tablist', { name: 'Me' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Full console' })).toHaveAttribute('href', '/admin')
+    await userEvent.click(screen.getByRole('tab', { name: 'Today' }))
+    expect(screen.getByRole('tab', { name: 'Today' })).toHaveAttribute('aria-selected', 'true')
+    expect(menu).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.getByRole('heading', { level: 2, name: 'Today' })).toBeInTheDocument()
+  })
   it('a caretaker lands on the caretaker page', async () => {
     asRole('employee')
     db.tables.staff_members = { data: { id: 's1', full_name: 'Test User', designation: 'caretaker', property_id: 'P1' }, error: null }

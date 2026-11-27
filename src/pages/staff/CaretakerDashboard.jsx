@@ -28,8 +28,9 @@ export default function CaretakerDashboard() {
   if (perms.error) return <div className="mx-auto max-w-3xl px-4 py-10"><ErrorBox error={perms.error} onRetry={perms.reload} /></div>
 
   const p = perms.data ?? {}
-  const tabs = [['today', 'Today'], ['complaints', 'My complaints'], ['rooms', 'Rooms and beds'],
-    ...(p.can_view_customers ? [['register', 'Guest register'], ['customers', 'Customers and dues']] : []), ['leave', 'Leave'], ['payslips', 'Payslips'], ['notices', 'Notices']]
+  const tabs = [['today', 'Today', 'Work', 'home'], ['complaints', 'My complaints', 'Work', 'wrench'], ['rooms', 'Rooms and beds', 'Work', 'bed'],
+    ...(p.can_view_customers ? [['register', 'Guest register', 'Work', 'list'], ['customers', 'Customers and dues', 'Work', 'rupee']] : []),
+    ['leave', 'Leave', 'Me', 'calendar'], ['payslips', 'Payslips', 'Me', 'receipt'], ['notices', 'Notices', 'Me', 'bell']]
 
   return (
     <Shell title="Caretaker" tabs={tabs} tab={tab} onTab={setTab} actions={<NotificationBell />}>

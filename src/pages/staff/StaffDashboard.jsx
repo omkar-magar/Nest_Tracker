@@ -26,8 +26,8 @@ export default function StaffDashboard() {
 
   const full = role === 'admin' || role === 'manager'
   const p = full ? { can_view_customers: true, can_manage_beds: true } : perms.data ?? {}
-  const tabs = [['today', 'Today'], ['rooms', 'Rooms and beds'], ...(p.can_view_customers ? [['customers', 'Customers and dues']] : []),
-    ['complaints', 'My complaints'], ['leave', 'Leave'], ['payslips', 'Payslips'], ['notices', 'Notices']]
+  const tabs = [['today', 'Today', 'Work', 'home'], ['rooms', 'Rooms and beds', 'Work', 'bed'], ...(p.can_view_customers ? [['customers', 'Customers and dues', 'Work', 'rupee']] : []),
+    ['complaints', 'My complaints', 'Work', 'wrench'], ['leave', 'Leave', 'Me', 'calendar'], ['payslips', 'Payslips', 'Me', 'receipt'], ['notices', 'Notices', 'Me', 'bell']]
 
   return (
     <Shell title="Staff dashboard" tabs={tabs} tab={tab} onTab={setTab} actions={<NotificationBell />}>
