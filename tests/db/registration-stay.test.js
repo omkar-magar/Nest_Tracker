@@ -111,6 +111,22 @@ describe('payment and approval', () => {
     expect(await reg()).toMatchObject({ state: 'active', payment_status: 'paid' })
     expect(await guestRow(guest)).toMatchObject({ stay_type: 'pg', rent_status: 'paid', deposit_status: 'paid', carry_forward: 0 })
   })
+  it('registering again while the stay is active changes nothing', async () => {
+    const before = { reg: await reg(), row: await guestRow(guest),
+      rows: (await one('select count(*)::int n from public.register_guests')).n,
+      notes: (await one("select count(*)::int n from public.notifications where kind = 'registration'")).n,
+      pays: (await one('select count(*)::int n from public.registration_payments')).n }
+    const free = (await as(db, null, ({ one: o }) => o("select public.registration_rooms('P1', 'pg') r")).then((x) => x.r))[0].room_no
+    await expect(submit(guest, { room_no: free, move_in_date: '2099-03-01' })).rejects.toThrow(/Your stay is active/)
+    await expect(payOnline(guest)).rejects.toThrow(/Send your registration form first|Nothing left to pay/)
+    await expect(as(db, guest, ({ q }) => q("select public.apply_registration_coupon('ANY')"))).rejects.toThrow()
+    await expect(approve(manager, guest)).rejects.toThrow(/no longer pending/)
+    expect(await reg()).toEqual(before.reg)
+    expect(await guestRow(guest)).toEqual(before.row)
+    expect((await one('select count(*)::int n from public.register_guests')).n).toBe(before.rows)
+    expect((await one("select count(*)::int n from public.notifications where kind = 'registration'")).n).toBe(before.notes)
+    expect((await one('select count(*)::int n from public.registration_payments')).n).toBe(before.pays)
+  })
   it('lets the manager switch to offline and approve with a part payment; the rest goes into the first rent', async () => {
     await expect(payOnline(other, 'success').then(() => null)).resolves.toBeNull() // other has a daily flat registration
     // a fresh guest who has not paid
