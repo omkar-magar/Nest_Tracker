@@ -29,6 +29,7 @@ const ResetPassword = lazy(() => import('./pages/ResetPassword'))
 const Vacancies = lazy(() => import('./pages/Vacancies'))
 const Brochure = lazy(() => import('./pages/Brochure'))
 const Unsubscribe = lazy(() => import('./pages/Unsubscribe'))
+const Download = lazy(() => import('./pages/Download'))
 // PG-management console (owner, managers, sales): one chunk per module
 const ManageLayout = lazy(() => import('./pages/manage/ManageLayout'))
 const Dashboard = lazy(() => import('./pages/manage/Dashboard'))
@@ -126,6 +127,7 @@ export default function App() {
           <Route path="terms" element={<Terms />} />
           <Route path="vacancies" element={<Vacancies />} />
           <Route path="unsubscribe" element={<Unsubscribe />} />
+          <Route path="download" element={<Download />} />
           <Route path="forgot-password" element={<ResetPassword mode="request" />} />
           <Route path="reset-password" element={<ResetPassword mode="update" />} />
           <Route path="account" element={<RequireRole roles={['customer']} loginPath="/login"><Account /></RequireRole>} />

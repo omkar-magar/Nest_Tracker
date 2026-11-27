@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import './index.css'
 import App from './App'
 import { AuthProvider } from './context/AuthContext'
+import './lib/installPrompt'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

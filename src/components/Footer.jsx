@@ -21,6 +21,7 @@ export default function Footer() {
             <li><Link className={col} to="/amenities">Amenities</Link></li>
             <li><Link className={col} to="/location">Location</Link></li>
             <li><Link className={col} to="/#faq">FAQ</Link></li>
+            <li><Link className={col} to="/download">Get the app</Link></li>
           </ul>
         </nav>
 
