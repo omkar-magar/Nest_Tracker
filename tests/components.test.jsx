@@ -7,6 +7,7 @@ vi.mock('../src/lib/supabase', () => import('./helpers/supabaseMock.js'))
 import { db, resetMock, setConfigured } from './helpers/supabaseMock.js'
 import { renderAt } from './helpers/render.jsx'
 import Img from '../src/components/Img'
+import { PHOTO_VERSION, photoUrl } from '../src/lib/photo'
 import PhotoGallery from '../src/components/PhotoGallery'
 import RoomCard from '../src/components/RoomCard'
 import Faq from '../src/components/Faq'
@@ -120,13 +121,13 @@ describe('Img', () => {
   it('renders a lazy image with alt text', () => {
     render(<Img src="/images/rooms/a.webp" alt="Room A" />)
     const img = screen.getByAltText('Room A')
-    expect(img).toHaveAttribute('src', '/images/rooms/a.webp')
+    expect(img).toHaveAttribute('src', '/images/rooms/a.webp?v=' + PHOTO_VERSION)
     expect(img).toHaveAttribute('loading', 'lazy')
   })
   it('falls back to the .jpg of the same name, then to a placeholder', () => {
     render(<Img src="/images/rooms/a.webp" alt="Room A" className="h-10" />)
     fireEvent.error(screen.getByAltText('Room A'))
-    expect(screen.getByAltText('Room A')).toHaveAttribute('src', '/images/rooms/a.jpg')
+    expect(screen.getByAltText('Room A')).toHaveAttribute('src', '/images/rooms/a.jpg?v=' + PHOTO_VERSION)
     fireEvent.error(screen.getByAltText('Room A'))
     const placeholder = screen.getByRole('img', { name: 'Room A' })
     expect(placeholder.tagName).toBe('DIV')
@@ -160,6 +161,16 @@ describe('Img', () => {
     render(<Img src="/x.png" alt="X" />)
     fireEvent.error(screen.getByAltText('X'))
     expect(screen.getByAltText('X')).toHaveAttribute('src', '/x.jpg')
+  })
+})
+
+describe('photoUrl', () => {
+  it('versions our own photos so replaced files are fetched again', () => {
+    expect(photoUrl('/images/rooms/a.webp')).toBe('/images/rooms/a.webp?v=' + PHOTO_VERSION)
+  })
+  it('leaves other URLs alone', () => {
+    expect(photoUrl('https://cdn.example.com/a.webp')).toBe('https://cdn.example.com/a.webp')
+    expect(photoUrl('/images/a.webp?v=9')).toBe('/images/a.webp?v=9')
   })
 })
 
@@ -640,8 +651,8 @@ describe('PhotoGallery', () => {
     expect(within(list).getAllByRole('listitem')).toHaveLength(gallery.length)
     gallery.forEach((p) => {
       const img = screen.getByAltText(p.alt)
-      expect(img).toHaveAttribute('src', p.src)
-      expect(img.closest('a')).toHaveAttribute('href', p.src)
+      expect(img).toHaveAttribute('src', photoUrl(p.src))
+      expect(img.closest('a')).toHaveAttribute('href', photoUrl(p.src))
     })
   })
   it('can show only the first few', () => {

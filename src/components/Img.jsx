@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { photoUrl } from '../lib/photo'
 
 // Lazy image with fallbacks: tries src, then the same name as .jpg, then shows a soft placeholder.
 // - a pale block shows until the photo arrives (no blank gap)
@@ -16,7 +17,7 @@ export default function Img({ src, alt = '', className = '', priority = false, s
 
   return (
     <img
-      src={current}
+      src={photoUrl(current)}
       srcSet={current === src ? srcSet : undefined}
       alt={alt}
       loading={priority ? 'eager' : 'lazy'}

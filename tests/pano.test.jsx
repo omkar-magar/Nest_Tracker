@@ -69,7 +69,7 @@ describe('PanoButton', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Open 360 view of Gym' }))
     const dialog = screen.getByRole('dialog', { name: '360 view of Gym' })
     expect(dialog).toHaveTextContent('The 360 view of Gym is coming soon.')
-    expect(screen.getByAltText('Gym')).toHaveAttribute('src', '/images/hero/gym.webp')
+    expect(screen.getByAltText('Gym')).toHaveAttribute('src', '/images/hero/gym.webp?v=2')
     expect(viewers).toHaveLength(0)
   })
 
